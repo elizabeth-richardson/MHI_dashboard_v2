@@ -179,15 +179,10 @@ output$title_sex <- renderUI({
     need( nrow(inequals_sex_data()) > 0, "No data available for this indicator currently. Please select another.")
   )
   
-  subtitle <- paste0("Definition: ", unique(sex_metadata()$short_definition))
+  subtitle <- HTML(paste0("<b>Definition:</b> ", unique(sex_metadata()$short_definition)))
   
-  
-  if (!(input$mhi_inequals_sex %in% paste0(dataless, "*"))) {
-    source <- HTML(gsub("<b>Source: </b>", "Source: ", sex_metadata()$source_url))
-  } else {
-    source <- ""
-  }
-  
+  source <- HTML(sex_metadata()$source_url)
+
   narrative_sex <- if (nrow(inequals_sex_data()) > 0) {
     HTML(sprintf("<b>Latest data:</b> In %s in %s, the %s was %.1f for females and %.1f for males.", 
                  unique(inequals_sex_data()$year_label[inequals_sex_data()$year == max(inequals_sex_data()$year)]), # year-label corresponding to latest year

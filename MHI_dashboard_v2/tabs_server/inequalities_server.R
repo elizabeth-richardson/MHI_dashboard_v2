@@ -22,11 +22,10 @@
 
 # enable/ disable filters and update the filter labels,
 # depending on what indicator was selected
- observe( {
-
-   req(input$mhi_inequals)
-
-   shinyjs::useShinyjs()
+observeEvent(input$mhi_inequals, { #actions to take only once mhi_trend has changed
+  #observe( {
+  
+  shinyjs::useShinyjs()
 
   available_sex <- (all_data %>%
                       subset(ind_name == input$mhi_inequals) %>%
@@ -41,22 +40,22 @@
   # If female and male data are available, enable sex_inequals filter, otherwise disable it
   if("Female" %in% available_sex) {
     shinyjs::enable("sex_inequals")
-    updateSelectInput(session, "sex_inequals")
+    updateSelectInput(session, "sex_inequals", selected = "Total")
   } else {
+    updateSelectInput(session, "sex_inequals", choices = c("Total (Males and Females)" = "Total"), selected = "Total")
     shinyjs::disable("sex_inequals")
-    updateSelectInput(session, "sex_inequals", choices = c("Total (Males and Females)" = ""))
   }
 
 
   # Disabling and unchecking CI option if no CIs available
   if (all(is.na(available_ci$lower_ci)) == TRUE) {
-    shinyjs::disable("ci_inequals")
     checkboxInput(session, "ci_inequals", value = FALSE)
+    shinyjs::disable("ci_inequals")
   } else {
     shinyjs::enable("ci_inequals")
   }
 
-} 
+} #, ignoreInit = TRUE 
 )
 
 
@@ -72,6 +71,7 @@
 inequals_trenddata <- reactive({
   
   req(input$mhi_inequals)
+  req(input$sex_inequals)
   
   df <- all_data %>%
     subset(ind_name == input$mhi_inequals & 
@@ -96,6 +96,7 @@ inequals_trenddata <- reactive({
 inequals_summarydata <- reactive({
   
   req(input$mhi_inequals)
+  req(input$sex_inequals)
   
   df <- ineq_data %>%
     subset(ind_name == input$mhi_inequals & 
@@ -110,11 +111,11 @@ inequals_summarydata <- reactive({
 inequals_metadata <- reactive({
   
   req(input$mhi_inequals)
-  
+
   df <- db_metadata %>%
     subset(ind_name == input$mhi_inequals) %>% 
     select(ind_name, domain,construct,short_definition,long_definition,source,measure,numerator,denominator,
-           weighted, standardised, conf_intervals, suppression, source_url
+           weighted, standardised, conf_intervals, suppression, source_url, sexes, years, geogs, simd
     )
 })
 
@@ -127,118 +128,32 @@ inequals_metadata <- reactive({
 
 output$title_inequals <- renderUI({
   
+  req(input$mhi_inequals)
+  req(input$sex_inequals)
+  req(inequals_trenddata())
+  
   # create dynamic text if no indicators available for selected profile
   # and geography
   shiny::validate(
     need( nrow(inequals_trenddata()) > 0, "No data available for this indicator currently. Please select another.")
   )
   
-  
-  if(nrow(inequals_trenddata()) > 0) {
-    indicator <- paste0(input$mhi_inequals, ifelse(input$sex_inequals=="Total", " (total population)",
-                                      ifelse(input$sex_inequals=="Male", " (males)", " (females)")))
-  } else {
-    ""
-  }
-  
-  subtitle <- paste0("Definition: ", unique(inequals_metadata()$short_definition))
-  
-  if (!(input$mhi_inequals %in% paste0(dataless, "*"))) {
-    source <- HTML(gsub("<b>Source: </b>", "Source: ", inequals_metadata()$source_url))
-  } else {
-    source <- ""
-  }
+  indicator <- paste0(input$mhi_inequals, 
+                      ifelse(input$sex_inequals=="Total", " (total population)",
+                             ifelse(input$sex_inequals=="Male", " (males)", " (females)")))
 
-  if (nrow(inequals_trenddata()) > 0) {
-    narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the %s was %.1f in the 20%% most deprived areas and %.1f in the 20%% least deprived areas (%s population).", 
-                 unique(inequals_trenddata()$year_label[inequals_trenddata()$year == max(inequals_trenddata()$year)]), # year-label corresponding to latest year
-                 tolower(unique(inequals_metadata()$measure)), # units
-                 inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "1st (Most deprived)"], # most dep value
-                 inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "5th (Least deprived)"], # least dep value
-                 tolower(input$sex_inequals) # sex
-    ))
-  } 
+  subtitle <- HTML(paste0("<b>Definition:</b> ", unique(inequals_metadata()$short_definition)))
   
-  # display 4 x titles
+  source <- HTML(inequals_metadata()$source_url)
+
+  
+ # display 3 x titles
   tagList(
     tags$h5(indicator, class = "chart-header"), # selected indicator
     tags$h6(subtitle), # definition plus units
-    tags$h6(source), # source of the data
-    tags$h6(narrative)
-  )
+    tags$h6(source) # source of the data
+      )
 })
-
-
-
-#narrative about the chart contents
-
-# output$narrative_inequals_trend <- renderUI({
-#   
-#   req(inequals_trenddata())
-#   
-#   if (nrow(inequals_trenddata()) > 0) {
-#     HTML(sprintf("<b>Latest data:</b> In %s, the %s was %.1f in the 20%% most deprived areas and %.1f in the 20%% least deprived areas (%s population).", 
-#                  unique(inequals_trenddata()$year_label[inequals_trenddata()$year == max(inequals_trenddata()$year)]), # year-label corresponding to latest year
-#                  tolower(unique(inequals_metadata()$measure)), # units
-#                  inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "1st (Most deprived)"], # most dep value
-#                  inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "5th (Least deprived)"], # least dep value
-#                  tolower(input$sex_inequals) # sex
-#     ))
-#   }
-# })
-
-# output$narrative_inequals_abs <- renderUI({
-#   
-#   req(inequals_summarydata())
-#   
-#   if (nrow(inequals_summarydata()) > 0) {
-#     
-#     if (min(inequals_summarydata()$sii)>=0) {
-#       
-#       HTML(sprintf("<b>Absolute inequality:</b> 
-#                <p><b>Latest data:</b> In %s, the most deprived area had a value %.1f higher than the least deprived area (Slope Index of Inequality (SII)).</p>
-#                <p><b>Interpretation:</b> A trend away from zero means that the absolute gap between the most and least deprived areas is growing.</p>", 
-#                    unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
-#                    inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop SII value
-#       )
-#     } else {
-#       
-#       HTML(sprintf("<b>Absolute inequality:</b>
-#                   <p><b>Latest data:</b> In %s, the most deprived area had a value %.1f lower than the least deprived area (Slope Index of Inequality (SII)).</p>
-#                   <p><b>Interpretation:</b> A trend away from zero means that the absolute gap between the most and least deprived areas is growing.</p>", 
-#                    unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
-#                    -1*inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop SII value
-#       )
-#       
-#     }
-#   }
-# })
-# 
-# output$narrative_inequals_rel <- renderUI({
-#   
-#   req(inequals_summarydata())
-#   
-#   if (nrow(inequals_summarydata()) > 0) {
-#     
-#     if (inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)] >0 ) {
-#       HTML(sprintf("<b>Relative inequality:</b>
-#                    <p><b>Latest data:</b> In %s, the most deprived area had a value that was %.1f%% above the population average value (calculated from the Relative Index of Inequality (RII)).</p>
-#                    <p><b>Interpretation:</b> A trend away from zero means that the relative gap between the most deprived area and the population average is growing.</p>",
-#                    unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
-#                    inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop RII value
-#       )
-#     } else if (inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)] <0 ) {
-#       HTML(sprintf("<b>Relative inequality:</b>
-#                    <p><b>Latest data:</b> In %s, the most deprived area had a value that was %.1f%% below the population average value (calculated from the Relative Index of Inequality (RII)).</p>
-#                    <p><b>Interpretation:</b> A trend away from zero means that the relative gap between the most deprived area and the population average is growing.</p>",
-#                    unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
-#                    -1*inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop RII value, multiplied by -1
-#       )
-#     }
-#   }
-# })
-
-
 
 
 # output$ci_text_inequals <- renderUI({
@@ -252,27 +167,109 @@ output$title_inequals <- renderUI({
 #   }
 # })
 
-output$plot1_title <- renderText(
+output$plot1_title <- renderUI({
   
-  if(nrow(inequals_trenddata()) > 0) {
-    "Change over time by deprivation group"
-  } else {
-    ""
-  })
-
-output$plot2_title <- renderText(
+  req(input$mhi_inequals)
+  req(input$sex_inequals)
+  req(inequals_trenddata())
   
-  if(nrow(inequals_trenddata()) > 0) {
-    "Absolute and relative inequalities over time"
-  } else {
-    ""
-  })
-
-# note about data download (reactive on whether there is data to plot)
-output$dnldnote_ineq <- renderText(
+  # create dynamic text if no indicators available for selected profile
+  # and geography
+  shiny::validate(
+    need( nrow(inequals_trenddata()) > 0, "No data available for this indicator currently. Please select another.")
+  )
+  
   if (nrow(inequals_trenddata()) > 0) {
-    "The data plotted in the charts are shown in the table below. Data can be sorted by clicking the diamond next to the column name, and downloaded as a spreadsheet by clicking the 'Download data' button."
+    narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the %s was %.1f in the 20%% most deprived areas and %.1f in the 20%% least deprived areas (%s population).", 
+                              unique(inequals_trenddata()$year_label[inequals_trenddata()$year == max(inequals_trenddata()$year)]), # year-label corresponding to latest year
+                              tolower(unique(inequals_metadata()$measure)), # units
+                              inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "1st (Most deprived)"], # most dep value
+                              inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "5th (Least deprived)"], # least dep value
+                              tolower(input$sex_inequals) # sex
+    ))
+  } else { narrative <- "" } 
+  
+  tagList(
+        tags$h5("Change over time by deprivation group"),
+        tags$h6(narrative)
+    )
   })
+
+output$plot2_title <- renderUI({
+  
+  req(input$mhi_inequals)
+  req(input$sex_inequals)
+  req(inequals_summarydata())
+  
+  # create dynamic text if no indicators available for selected profile
+  # and geography
+  shiny::validate(
+    need( nrow(inequals_summarydata()) > 0, "No data available for this indicator currently. Please select another.")
+  )
+  
+  if (min(inequals_summarydata()$sii)>=0) {
+
+        narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value %.1f higher than the least deprived area (Slope Index of Inequality (SII)).</p>
+                 <p><b>Interpretation:</b> A trend away from zero means that the absolute gap between the most and least deprived areas is growing.</p>",
+                     unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
+                     inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop SII value
+        )
+      } else if (min(inequals_summarydata()$sii)>0) {
+
+        narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value %.1f lower than the least deprived area (Slope Index of Inequality (SII)).</p>
+                    <p><b>Interpretation:</b> A trend away from zero means that the absolute gap between the most and least deprived areas is growing.</p>",
+                     unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
+                     -1*inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop SII value
+        )
+      } else { narrative <- "" } 
+
+  tagList(
+    tags$h5("Absolute inequality over time"),
+    tags$h6(narrative)
+  )
+})
+
+output$plot3_title <- renderUI({
+  
+  req(input$mhi_inequals)
+  req(input$sex_inequals)
+  req(inequals_summarydata())
+  
+  # create dynamic text if no indicators available for selected profile
+  # and geography
+  shiny::validate(
+    need( nrow(inequals_summarydata()) > 0, "No data available for this indicator currently. Please select another.")
+  )
+  
+    if (nrow(inequals_summarydata()) > 0) {
+
+      if (inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)] >0 ) {
+        narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value that was %.1f%% above the population average value (calculated from the Relative Index of Inequality (RII)).</p>
+                     <p><b>Interpretation:</b> A trend away from zero means that the relative gap between the most deprived area and the population average is growing.</p>",
+                     unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
+                     inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop RII value
+        )
+      } else if (inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)] <0 ) {
+        narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value that was %.1f%% below the population average value (calculated from the Relative Index of Inequality (RII)).</p>
+                     <p><b>Interpretation:</b> A trend away from zero means that the relative gap between the most deprived area and the population average is growing.</p>",
+                     unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
+                     -1*inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop RII value, multiplied by -1
+        )
+      } else { narrative <- "" } 
+    } else { narrative <- "" }
+
+  
+  tagList(
+    tags$h5("Relative inequality over time"),
+    tags$h6(narrative)
+  )
+})
+
+# # note about data download (reactive on whether there is data to plot)
+# output$dnldnote_ineq <- renderText(
+#   if (nrow(inequals_trenddata()) > 0) {
+#     "The data plotted in the charts are shown in the table below. Data can be sorted by clicking the diamond next to the column name, and downloaded as a spreadsheet by clicking the 'Download data' button."
+#   })
 
 # download button under plot (reactive on whether there is data to plot)
 output$dnldButton_ineq <- renderUI({
@@ -283,99 +280,11 @@ output$dnldButton_ineq <- renderUI({
 
 
 
-output$title_trend <- renderUI({
-  
-  # create dynamic text if no indicators available for selected profile
-  # and geography
-  shiny::validate(
-    need( nrow(inequals_trenddata()) > 0, "No data available for this indicator currently. Please select another.")
-  )
-  
-  if(input$mhi_inequals != "") {
-    indicator <- paste0(input$mhi_inequals,
-                        ifelse(input$sex_inequals=="Total", " (total population)", 
-                               ifelse(input$sex_inequals=="Male", " (males)", " (females)") 
-           ))
-  } else {
-    indicator <- ""
-  }
-  
-  subtitle <- paste0("Definition: ", unique(trend_metadata()$short_definition))
-  
-  
-  if (!(input$mhi_inequals %in% paste0(dataless, "*"))) {
-    source <- HTML(gsub("<b>Source: </b>", "Source: ", trend_metadata()$source_url))
-  } else {
-    source <- ""
-  }
-  
-  narrative_trend <- if (length(unique(inequals_trenddata()$spatial.unit)) == 1) {
-      HTML(sprintf("Latest: In %s, the %s was %.1f for the %s population of %s.", 
-                   unique(inequals_trenddata()$year_label[inequals_trenddata()$year == max(inequals_trenddata()$year)]), # year-label corresponding to latest year
-                   tolower(trend_metadata()$measure), # units
-                   inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$sex == input$sex_inequals], #value
-                   tolower(input$sex_inequals),#sex
-                   unique(inequals_trenddata()$spatial.unit) # spatial unit
-      ))
-    } else if (length(unique(inequals_trenddata()$spatial.unit)) > 1) {
-      if (min(nchar(inequals_trenddata()$year_label)) == max(nchar(inequals_trenddata()$year_label))) { # case when same time periods used throughout, for all spatial units
-        HTML(sprintf("Latest: In the selected areas, the %s %s for the %s population was highest in %s (%.1f) and lowest in %s (%.1f).", 
-                     unique(inequals_trenddata()$year_label[inequals_trenddata()$year == max(inequals_trenddata()$year)]), # year-label corresponding to latest year
-                     tolower(trend_metadata()$measure), # units
-                     tolower(input$sex_inequals),#sex
-                     inequals_trenddata()$spatial.unit[inequals_trenddata()$value == max(inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year)]) & inequals_trenddata()$year == max(inequals_trenddata()$year)], # area with highest value at latest time point
-                     max(inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year)]), #highest value
-                     inequals_trenddata()$spatial.unit[inequals_trenddata()$value == min(inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year)]) & inequals_trenddata()$year == max(inequals_trenddata()$year)], # area with lowest value at latest time point
-                     min(inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year)]) #lowest value
-        )
-        )
-      } else {
-        HTML(sprintf("Latest: In the latest data available for all selected areas, the %s for the %s population was highest in %s (%.1f) and lowest in %s (%.1f).", 
-                     tolower(trend_metadata()$measure), # units
-                     tolower(input$sex_inequals),#sex
-                     unique(inequals_trenddata()$spatial.unit[inequals_trenddata()$value == unique(max(inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year[inequals_trenddata()$spatial.unit!="Scotland"])])) 
-                                                      & inequals_trenddata()$year == max(inequals_trenddata()$year[inequals_trenddata()$spatial.unit!="Scotland"])]), # area with highest value at latest shared time point
-                     unique(max(inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()[inequals_trenddata()$spatial.unit!="Scotland"]$year)])),#, #highest value
-                     unique(inequals_trenddata()$spatial.unit[inequals_trenddata()$value == unique(min(inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year[inequals_trenddata()$spatial.unit!="Scotland"])])) 
-                                                      & inequals_trenddata()$year == max(inequals_trenddata()$year[inequals_trenddata()$spatial.unit!="Scotland"])]), # area with lowest value at latest shared time point
-                     unique(min(inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()[inequals_trenddata()$spatial.unit!="Scotland"]$year)]))
-        )
-        )
-      }
-    }
-    
-# display 4 x titles
-tagList(
-  tags$h5(indicator, class = "chart-header"), # selected indicator
-  tags$h6(subtitle), # definition plus units
-  tags$h6(source), # source of the data
-  tags$h6(narrative_trend)
-)
-
-})
-
-
-output$ci_text_trend <- renderUI({
-  req(input$ci_inequals)
-  
-  if(input$ci_inequals == TRUE) {
-    HTML("<b>Interpretation:</b> A confidence interval (CI) has a 95% probability of containing the true value being estimated. 
-         Values can be said to be ‘significantly different’ if their CIs do not overlap.")
-  } else {
-    ""
-  }
-})
-
-output$geo_instructions <- renderUI({
-  paste0("Select areas to plot and compare. You can select multiple areas of any available geography type. Delete areas to remove from selection.")
-})
-
-
-
 # note about the data table 
-output$data_trend <- renderUI({
+output$data_inequals <- renderUI({
   
   req(input$mhi_inequals)
+  req(input$sex_inequals)
   
   if (nrow(inequals_trenddata()) > 0) {
 
@@ -389,7 +298,7 @@ output$data_trend <- renderUI({
 
 
 # note about the metadata table 
-output$metadata_trend <- renderUI({
+output$metadata_inequals <- renderUI({
   
   req(input$mhi_inequals)
   
@@ -401,241 +310,175 @@ output$metadata_trend <- renderUI({
 
 
 # download button under plot (reactive on whether there is data to plot)
-output$dnldButton_trend <- renderUI({
+output$dnldButton_ineq <- renderUI({
   if (nrow(inequals_trenddata()) > 0) {
     downloadButton("trend_dnld", "Download data (.xlsx format)")
   }
 })
 
 
-output$trend_plot <- renderPlot({   # for ggplot
+
+
+
+# Inequalities trend plot ----
+
+
+output$simd_trend_plot <- renderPlot({
   
-  # Obtain length of all areas to be plotted, if more than 12, then 12,
-  # this avoids issues. An error message is displayed if >12 are selected. 
+  req(inequals_trenddata(), inequals_metadata())
   
-  trend_length <- ifelse(length(unique(inequals_trenddata()$spatial.unit)) > 12, 12,
-                         length(unique(inequals_trenddata()$spatial.unit)))
+  #Palette for plot
+  pal_simd_trend <- c("Scotland" = '#000000', #black, lighter = #ddd
+                      "1st (Most deprived)" = "#83BB26", # lighter = "#DAEBBE"
+                      "2nd" = "#0078D4", # lighter = "#B3D7F2"
+                      "3rd" = "#1E7F84", # lighter = "#BCD9DA"
+                      "4th" = "#9B4393", # lighter = "#E1C7DF"
+                      "5th (Least deprived)" = "#3F3685" # lighter = "#C5C3DA"
+  )
   
-  # Define the palette of colours to be used, 
-  # spatial.unit is a factor: Scotland is always first so always black.
-  phscolours <- c("#000000", #black
-                  "#3F3685", "#9B4393", "#0078D4", "#83BB26", "#948DA3", 
-                  "#1E7F84", "#6B5C85", "#C73918", "#655E9D", "#9F9BC2",
-                  "#C5C3DA", "#ECEBF3")
-  
-  yaxis_title <- ifelse(trend_metadata()$measure=="Crude rate per 1000 adults", "Crude\nrate\nper\n1000\nadults",
-                        ifelse(trend_metadata()$measure=="Age-standardised rate per 100,000 adults", 
+  yaxis_title <- ifelse(inequals_metadata()$measure=="Crude rate per 1000 adults", "Crude\nrate\nper\n1000\nadults",
+                        ifelse(inequals_metadata()$measure=="Age-standardised rate per 100,000 adults", 
                                "Age-\nstandardised\nrate\nper\n100,000\nadults",
-                               ifelse(trend_metadata()$measure=="Mean score", 
-                                      "Mean\nscore",
-                                      trend_metadata()$measure)))
+                               ifelse(inequals_metadata()$measure=="Mean score", 
+                                      "Mean score", inequals_metadata()$measure)))
   
+  # Year labels for x-axis: expand and fill any gaps in the series 
+  if(nrow(inequals_trenddata()) > 0) {
+    year_labels <- sort(unique(inequals_trenddata()$year_label)) # all the year labels in this data extract (strings)
+    max_label_chars <- max(nchar(year_labels)) # longest length of the labels
+    years <- sort(unique(inequals_trenddata()$year)) # all the numeric years in the data extract
+    gap <- ifelse(length(years)<6, 1,ifelse(length(years)<13, 2, 3)) # what spacing to use when plotting labels
+    all_years <- data.frame(years = seq(min(years), max(years), 1)) # full sequence of years from earliest to latest (as some series have gaps)
+    df <- data.frame(year_labels, years) %>%
+      merge(y = all_years, by="years", all=TRUE) %>% # if the df previously contained gaps this expands it to include all numeric years in the series 
+      # now to fill in the gaps in the year labels to correspond to the numeric years
+      mutate(next_label = lead(year_labels),
+             year_labels = case_when(is.na(year_labels) & max_label_chars==4  ~ as.character(years), # gaps in single year data can be >1 so this captures these cases
+                                     # fills in the gaps for the 9, 7 and 15 character labels (if only single gaps):
+                                     is.na(year_labels) & nchar(next_label)==4 ~ paste0(-1+as.numeric(substr(next_label, 1, 4))),
+                                     is.na(year_labels) & nchar(next_label)==9 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "-", 
+                                                                                        -1+as.numeric(substr(next_label, 6, 9))),
+                                     is.na(year_labels) & nchar(next_label)==7 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "/", 
+                                                                                        -1+as.numeric(substr(next_label, 6, 7))),
+                                     is.na(year_labels) & nchar(next_label)==15 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "/", 
+                                                                                         -1+as.numeric(substr(next_label, 6, 7)), "-",
+                                                                                         -1+as.numeric(substr(next_label, 9, 12)), "/", 
+                                                                                         -1+as.numeric(substr(next_label, 14, 15))),
+                                     TRUE ~ year_labels))
+    
+    
+    new_years = sort(df$years)
+    new_year_labels = sort(df$year_labels)
+    new_year_labels_wrapped <- sort(gsub("-", "-\n", new_year_labels))
+  } 
   
-  if (input$mhi_inequals=="") {
+  if (input$mhi_inequals == "") {
     
     plot_pleaseselectind()
     
-  } else if (input$mhi_inequals %in% paste0(dataless, "*")) {
+  } else if (is.data.frame(inequals_trenddata()) && nrow(inequals_trenddata()) == 0)  {
     
-    plot_dataless()
+    plot_nodata()
     
-  } else if (is.data.frame(inequals_trenddata()) && nrow(inequals_trenddata()) == 0) {
+  } else { #If data is available then plot it
     
-    plot_pleaseselectarea()
-    
-  } else if (trend_length > 12) { #but it can't be >12 can it?
-    
-    plot_fewerpoints()
-    
-  } else if (is.data.frame(inequals_trenddata()) && nrow(inequals_trenddata()) > 0) { #If data is available then plot it
-    
-    # Do some label fudging for the SCJS combined years
-    if(input$mhi_inequals %in% c("Victims of violent crime", "Victims of non-violent crime", "Perception of local crime") 
-       & "PD" %in% unique(inequals_trenddata()$spatial.scale) & input$scotname_trend==TRUE) {
-      chart_data <- inequals_trenddata() %>%
-        mutate(year_label = case_when(year_label == "2016/18" ~ "2016/17",
-                                      year_label == "2018/20" ~ "2018/19")) 
-    } else {
-      chart_data <- inequals_trenddata()
-    } 
-    
-    year_labels <- sort(unique(inequals_trenddata()$year_label)) # all the year labels in this data extract (strings)
-    years <- sort(unique(inequals_trenddata()$year)) # all the numeric years in the data extract
-    all_years <- data.frame(years = seq(min(years), max(years), 1)) # full sequence of years from earliest to latest (as some series have gaps)
-    max_label_chars <- max(nchar(year_labels)) # longest length of the labels
-    
-    # Very ugly hacky way to get labels right in situations where...
-    # ... labels change span over time (SHeS for LA/HB in 2017-2021) and there are big gaps in the data that need filling ...
-    if(input$mhi_inequals %in% shes_scotland_dups & ("LA" %in% unique(inequals_trenddata()$spatial.scale) | "HB" %in% unique(inequals_trenddata()$spatial.scale))) { # add in the non-standard SHeS labelling (to account for missing 2020)
-      new_years = c(2009:2018)
-      new_year_labels = c("2008-2011", "2009-2012",
-                          "2010-2013", "2011-2014",
-                          "2012-2015", "2013-2016",
-                          "2014-2017", "2015-2018",
-                          "2016-2019", "2017-2021")
-      # ... or if Scotland and the lower geogs have different time periods (SCJS data) as well as changing span over the time period. 
-    } else if(grepl("Scottish Crime and Justice Survey", trend_metadata()$source) & "PD" %in% unique(inequals_trenddata()$spatial.scale) & input$scotname_trend==TRUE) {
-      new_years = c(2008:2021)
-      new_year_labels = c("2008/09", "2009/10", "2010/11", "2011/12",
-                          "2012/13", "2013/14", "2014/15", "2015/16",
-                          "2016/17", "2017/18", "2018/19", "2019/20",
-                          "2020/21", "2021/22")
-    } else {
-      df <- data.frame(year_labels, years) %>%
-        merge(y = all_years, by="years", all=TRUE) %>% # if the df previously contained gaps this expands it to include all numeric years in the series 
-        # now to fill in the gaps in the year labels to correspond to the numeric years
-        mutate(next_label = lead(year_labels),
-               prev_label = lag(year_labels),
-               year_labels = case_when(is.na(year_labels) & max_label_chars==4  ~ as.character(years), # gaps in single year data can be >1 so this captures these cases
-                                       # fills in the gaps for the 9, 7 and 15 character labels (if only single gaps):
-                                       is.na(year_labels) & nchar(next_label)==4 ~ paste0(-1+as.numeric(substr(next_label, 1, 4))),
-                                       is.na(year_labels) & nchar(next_label)==9 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "-", 
-                                                                                          -1+as.numeric(substr(next_label, 6, 9))),
-                                       is.na(year_labels) & nchar(next_label)==7 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "/", 
-                                                                                          -1+as.numeric(substr(next_label, 6, 7))),
-                                       is.na(year_labels) & nchar(next_label)==15 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "/", 
-                                                                                           -1+as.numeric(substr(next_label, 6, 7)), "-",
-                                                                                           -1+as.numeric(substr(next_label, 9, 12)), "/", 
-                                                                                           -1+as.numeric(substr(next_label, 14, 15))),
-                                       TRUE ~ year_labels)) %>%
-        mutate(year_labels = case_when(# fills in any remaining gaps for the 9, 7 and 15 character labels (if only single gaps):
-          is.na(year_labels) & nchar(prev_label)==4 ~ paste0(1+as.numeric(substr(prev_label, 1, 4))),
-          is.na(year_labels) & nchar(prev_label)==9 ~ paste0(1+as.numeric(substr(prev_label, 1, 4)), "-", 
-                                                             1+as.numeric(substr(prev_label, 6, 9))),
-          is.na(year_labels) & nchar(prev_label)==7 ~ paste0(1+as.numeric(substr(prev_label, 1, 4)), "/", 
-                                                             1+as.numeric(substr(prev_label, 6, 7))),
-          is.na(year_labels) & nchar(prev_label)==15 ~ paste0(1+as.numeric(substr(prev_label, 1, 4)), "/", 
-                                                              1+as.numeric(substr(prev_label, 6, 7)), "-",
-                                                              1+as.numeric(substr(prev_label, 9, 12)), "/", 
-                                                              1+as.numeric(substr(prev_label, 14, 15))),
-          TRUE ~ year_labels))
-      
-      new_years = sort(df$years)
-      new_year_labels = sort(df$year_labels)
-    }
-    
-    
-    
-    new_year_labels_wrapped <- sort(gsub("-", "-\n", new_year_labels))
-    gap <- ifelse(length(new_year_labels_wrapped)<9, 1, ifelse(length(new_year_labels_wrapped)<18, 2, ifelse(length(new_year_labels_wrapped)<26, 3, 4))) # what spacing to use when plotting labels
-    
-    trend_plot <- ggplot(inequals_trenddata(),
-                         aes(x = year, y = value,
-                             colour = spatial.unit,
-                             linetype = spatial.unit, 
-                             group = spatial.unit)) +
+    inequals_plot <- ggplot(inequals_trenddata(),
+                            aes(x = year, y = value,
+                                colour = spatial.unit,
+                                linetype = spatial.unit, 
+                                group = spatial.unit)) +
       geom_line(linewidth = 1) +
       geom_point(size=3) +
       theme_phs() +
-      scale_colour_manual("", values = phscolours) + 
-      scale_linetype_manual("", values = c("solid", "dotted", "dashed", "solid", "dotted", "dashed",
-                                           "solid", "dotted", "dashed", "solid", "dotted", "dashed")) + 
-      #      scale_x_continuous(breaks = seq(min(inequals_trenddata()$year), max(inequals_trenddata()$year), gap)) +
-      scale_x_continuous("Year", # treating as continuous ensures the series matches the positioning of the new labels
+      scale_colour_manual(name = "Deprivation group", values = pal_simd_trend) +  #can't get legend name to plot
+      scale_linetype_manual(name = "Deprivation group", values = c("solid", "solid", "dotted", "dashed", "dotted", "dashed")) + 
+      scale_x_continuous("Year",
                          minor_breaks = new_years[seq(1, length(new_years), by = 1)],
                          breaks = new_years[seq(1, length(new_years), by = gap)],
-                         labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap)]#,
-                       #  guide = "axis_minor"
-                         ) +
-      theme(text = element_text(size=20, family="Arial"),
-            axis.title.y = element_text(face = "bold", size = 18, angle = 0, vjust = 0.5),
+                         labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap)]) +
+      #      guides(colour = guide_legend(title = "Deprivation group"), # this didn't work
+      #             linetype = guide_legend(title = "Deprivation group")) +
+      theme(text = element_text(size=20#, family="Arial"
+                                ),
+            axis.title.y = element_text(face = "bold", size = 18, angle = 0, vjust = 0.9),
             axis.title.x = element_text(face = "bold", size = 18),
             axis.text.x = element_text(size = 18, colour = 'black'),
             axis.text.y = element_text(size = 18, colour = 'black'),
             axis.ticks.x = element_line(),
-            legend.text = element_text(size = 18),
-            legend.justification = c(0, 1),
-            legend.position = "top",
-            legend.key.size = unit(1, 'cm'),
+            legend.text = element_text(size = 16),
+            legend.position = "inside",
+            legend.position.inside = c(-0.05, 0.2),
+            legend.justification="right",
           #  legend.location = "plot",
+            legend.key.size = unit(1, 'cm'),
             axis.line = element_line(color = 'black'),
             panel.grid.major = element_blank(),
             panel.grid.minor = element_blank(),
-            panel.grid.major.x = element_blank()) +
-      labs(alt = alt_text(),
-           x = "Year",
-           y = yaxis_title)
-    
+            panel.grid.major.x = element_blank(),
+            plot.margin = unit(c(0,0,0,8), "lines")) +
+      labs(alt = alt_text_ineqs(),
+           y = yaxis_title,
+           colour = "Deprivation group", # this didn't work
+           linetype = "Deprivation group") # this didn't work
     
     #Adding confidence intervals depending on user input
     if (input$ci_inequals == TRUE) {
-      trend_plot <- trend_plot +
+      inequals_plot <- inequals_plot +
         geom_ribbon(aes(ymin=lower_ci, ymax=upper_ci, fill=spatial.unit), alpha=0.1, colour=NA) +
-        scale_fill_manual("", values = phscolours)  
+        scale_fill_manual("", values = pal_simd_trend)  
       
-    } else { trend_plot }
+    } else { inequals_plot }
     
     #Plotting y=0 depending on user input
-    if (input$zero_trend==TRUE) {
-      trend_plot <- trend_plot +
-        scale_y_continuous(#oob = scales::oob_keep,
-          limits=c(0, NA),
-          expand = expansion(mult = c(0, 0.1)),
-          labels = scales::comma) 
-      
+    if (input$zero_inequals==TRUE) {
+      inequals_plot <- inequals_plot +
+        scale_y_continuous(limits=c(0, NA),
+                           expand = expansion(mult = c(0, 0.1)),
+                           labels = scales::comma) 
     } else {
-      trend_plot <- trend_plot +
-        scale_y_continuous(#oob = scales::oob_keep,
-          expand = expansion(mult = c(0, 0.1)),
-          labels = scales::comma)
+      inequals_plot <- inequals_plot +
+        scale_y_continuous(expand = expansion(mult = c(0, 0.1)),
+                           labels = scales::comma)
     }
     
-    trend_plot
-  } else {
-    paste0("no data, oh dear!")
+    inequals_plot
   }
+  
+  
   
 })
 
-
-output$trend_hover_info <- renderUI({ # code from https://gitlab.com/-/snippets/16220
-  
+output$inequals_hover_info <- renderUI({ # code from https://gitlab.com/-/snippets/16220
   req(inequals_trenddata())
-  hover <- input$plot_hover
-  point <- nearPoints(inequals_trenddata(), hover, threshold = 5, maxpoints = 1, addDist = TRUE) # threshold was 50
-  if (nrow(point) == 0) return(NULL)
-  
-  #colour palette used here
-  phscolours <- c("#000000", #black
-                  "#3F3685", "#9B4393", "#0078D4", "#83BB26", "#948DA3", 
-                  "#1E7F84", "#6B5C85", "#C73918", "#655E9D", "#9F9BC2",
-                  "#C5C3DA", "#ECEBF3")
-  
-  # get the spatial units selected
-#  selected_spunit <- unique(inequals_trenddata()$spatial.unit) %>%
-    # mutate(spatial.unit = factor(spatial.unit,# adjusting levels of spatial.scale, so Scotland always plotted as black
-    #                              levels = c("Scotland", hb_names, la_names, pd_names
-    #                              )))
-  selected <- inequals_trenddata() %>%
-    group_by(spatial.unit) %>%
-    summarise() %>%
-    mutate(spatial.unit = factor(spatial.unit,# adjusting levels of spatial.scale, so Scotland always plotted as black
-                                 levels = c("Scotland", hb_names, la_names, pd_names
-                                 )))
-  selected_spunits <- unique(selected$spatial.unit)
-  
-  
-  # number of the hovered spatial unit:
-  match <- match(point$spatial.unit, selected_spunits)
-  trend_colour <- phscolours[[match]]
+  req(input$plot_hover1)
+  hover1 <- input$plot_hover1
+  point1 <- nearPoints(inequals_trenddata(), hover1, threshold = 5, maxpoints = 1, addDist = TRUE) # threshold was 50
+  if (nrow(point1) == 0) return(NULL)
   
   # get distance from left and bottom side of the image in pixels
-  left_px <- hover$coords_css$x
-  top_px <- hover$coords_css$y
+  left_px1 <- hover1$coords_css$x
+  top_px1 <- hover1$coords_css$y
+  
+  # match the colours
+  simd_colour <- ifelse(point1$spatial.unit == "Scotland", "#ddd",
+                        ifelse(point1$spatial.unit == "1st (Most deprived)", "#DAEBBE",
+                               ifelse(point1$spatial.unit == "2nd", "#B3D7F2",
+                                      ifelse(point1$spatial.unit == "3rd", "#BCD9DA",
+                                             ifelse(point1$spatial.unit == "4th", "#E1C7DF", "#C5C3DA"))))) 
   
   # create style property for tooltip
   # background color is set so tooltip is a bit transparent (phs-magenta-30)
   # z-index is set so we are sure are tooltip will be on top
-  style <- paste0("position:absolute; z-index:100; pointer-events:none; 
-                   background-color: ", trend_colour, "; opacity: 0.9; color: white;",
-                  "left:", left_px+1, "px; top:", top_px+1, "px;") # was +2
+  style <- paste0("position:absolute; z-index:100; pointer-events:none; opacity: 0.9; 
+                   background-color: ", simd_colour, "; ",
+                  "left:", left_px1+2, "px; top:", top_px1+2, "px;")
   
-  # actual tooltip created as wellPanel 
+  # actual tooltip created as wellPanel (drop detail here, apart from time period?)
   wellPanel(
     style = style,
-    p(HTML(paste0("<b> Area: </b>", point$spatial.unit, "<br/>",
-                  "<b> Value: </b>", rnd1dp(point$value), "<br/>",
-                  "<b> Time period: </b>", point$year_label)
+    p(HTML(paste0("<b>", point1$spatial.unit, ":</b><br/>",
+                  "<b> Value: </b>", rnd1dp(point1$value), "<br/>",
+                  "<b> Time period: </b>", point1$year_label)
     )
     )
   )
@@ -643,74 +486,398 @@ output$trend_hover_info <- renderUI({ # code from https://gitlab.com/-/snippets/
 })
 
 
-alt_text <- reactive({
+
+alt_text_ineqs <- reactive({
   
   text <- paste0("The x-axis displays years and the y-axis displays the ",
-                 trend_metadata()$measure, " of ",
+                 unique(inequals_metadata()$measure), " of ",
                  input$mhi_inequals, 
-                 ". Lines representing one or more geographic areas have been plotted using different colours and line types. The data are also presented in the table below the chart, and can be downloaded as a spreadsheet.")
+                 ". Values for the different deprivation quintiles have been plotted using different colours and line types. The data are also presented in the table below the chart, and can be downloaded as a spreadsheet.")
   
   return(text)
   
 })
 
 ###############################################.
+## SII plot ----
+###############################################.
+
+#SII plot
+
+output$simd_sii_plot <- renderPlot({
+  
+  req(inequals_summarydata())
+  
+  yaxis_title <- ifelse(inequals_metadata()$measure=="Crude rate per 1000 adults", "Difference\nin crude\nrate per\n1000\nadults",
+                        ifelse(inequals_metadata()$measure=="Age-standardised rate per 100,000 adults", 
+                               "Difference\nin age-\nstandardised\nrate\nper\n100,000\nadults",
+                               ifelse(inequals_metadata()$measure=="Mean score", 
+                                      "Difference\nin\nmean score",
+                                      ifelse(inequals_metadata()$measure=="Percentage", 
+                                             "Difference\nin\n%", inequals_summarydata()$measure))))
+  
+  # Year labels for x-axis: expand and fill any gaps in the series 
+  
+  if(nrow(inequals_summarydata()) > 0) {
+    year_labels <- sort(unique(inequals_summarydata()$year_label)) # all the year labels in this data extract (strings)
+    max_label_chars <- max(nchar(year_labels)) # longest length of the labels
+    years <- sort(unique(inequals_summarydata()$year)) # all the numeric years in the data extract
+    gap <- ifelse(length(years)<5, 1,ifelse(length(years)<10, 2, 3)) # what spacing to use when plotting labels
+    all_years <- data.frame(years = seq(min(years), max(years), 1)) # full sequence of years from earliest to latest (as some series have gaps)
+    df <- data.frame(year_labels, years) %>%
+      merge(y = all_years, by="years", all=TRUE) %>% # if the df previously contained gaps this expands it to include all numeric years in the series 
+      # now to fill in the gaps in the year labels to correspond to the numeric years
+      mutate(next_label = lead(year_labels),
+             year_labels = case_when(is.na(year_labels) & max_label_chars==4  ~ as.character(years), # gaps in single year data can be >1 so this captures these cases
+                                     # fills in the gaps for the 9, 7 and 15 character labels (if only single gaps):
+                                     is.na(year_labels) & nchar(next_label)==4 ~ paste0(-1+as.numeric(substr(next_label, 1, 4))),
+                                     is.na(year_labels) & nchar(next_label)==9 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "-", 
+                                                                                        -1+as.numeric(substr(next_label, 6, 9))),
+                                     is.na(year_labels) & nchar(next_label)==7 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "/", 
+                                                                                        -1+as.numeric(substr(next_label, 6, 7))),
+                                     is.na(year_labels) & nchar(next_label)==15 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "/", 
+                                                                                         -1+as.numeric(substr(next_label, 6, 7)), "-",
+                                                                                         -1+as.numeric(substr(next_label, 9, 12)), "/", 
+                                                                                         -1+as.numeric(substr(next_label, 14, 15))),
+                                     TRUE ~ year_labels))
+    
+    
+    new_years = sort(df$years)
+    new_year_labels = sort(df$year_labels)
+    new_year_labels_wrapped <- sort(gsub("-", "-\n", new_year_labels))
+  }  
+  
+  #If no SII data for that period then plot message saying data is missing
+  if (all(is.na(inequals_summarydata()$sii)))
+  {
+    sii_plot <- ""
+    
+  } else { #If data is available then plot it
+    
+    sii_plot <- ggplot(inequals_summarydata(),
+                       aes(x = year, y = sii, group = sex)) +
+      geom_line(linewidth = 2, colour = "#C73918") +
+      geom_point(size=3, colour = "#C73918") +
+      geom_hline(yintercept=0) +
+      theme_phs() +
+      theme(text = element_text(size=18#, family="Arial"
+                                ),
+            axis.title.y = element_text(face = "bold", size = 18, angle = 0, vjust = 0.5),
+            axis.title.x = element_text(face = "bold", size = 18),
+            axis.text.x = element_text(size = 18, colour = 'black'),
+            axis.text.y = element_text(size = 18, colour = 'black'),
+            axis.ticks.x = element_line(),
+            legend.position = "none",
+            axis.line = element_line(color = 'black'),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.grid.major.x = element_blank()) +
+      labs(alt = alt_text_sii(),
+           y = yaxis_title)
+    
+    #Adding confidence intervals depending on user input
+    if (input$ci_inequals == TRUE) {
+      sii_plot <- sii_plot +
+        geom_ribbon(aes(ymin=lowci_sii, ymax=upci_sii), fill="#9B4393", alpha=0.1, colour=NA)   
+      
+    } else { sii_plot }
+    
+    
+    #Include zero, and position axis depending on whether values are negative or positive
+    if (max(inequals_summarydata()$sii)<=0) { # all values negative
+      sii_plot <- sii_plot +
+        scale_y_continuous(limits=c(NA, 0),
+                           expand = expansion(mult = c(0.1, 0)),
+                           labels = scales::comma) +
+        scale_x_continuous("Year",
+                           expand = expansion(mult = c(0.1, 0.1)),
+                           minor_breaks = new_years[seq(1, length(new_years), by = 1)],
+                           breaks = new_years[seq(1, length(new_years), by = gap+1)],
+                           labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap+1)], 
+                           position = "top") 
+      
+      
+    } else if (min(inequals_summarydata()$sii)>=0) { # all values positive
+      sii_plot <- sii_plot +
+        scale_y_continuous(limits=c(0, NA),
+                           expand = expansion(mult = c(0, 0.1)),
+                           labels = scales::comma) +
+        scale_x_continuous("Year",
+                           expand = expansion(mult = c(0.1, 0.1)),
+                           minor_breaks = new_years[seq(1, length(new_years), by = 1)],
+                           breaks = new_years[seq(1, length(new_years), by = gap+1)],
+                           labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap+1)]
+        ) 
+      
+      
+    } else { sii_plot <- sii_plot +             # if has positive and negative values
+      scale_y_continuous(expand = expansion(mult = c(0.1, 0.1)),
+                         labels = scales::comma) +
+      scale_x_continuous("Year",
+                         expand = expansion(mult = c(0.1, 0.1)),
+                         minor_breaks = new_years[seq(1, length(new_years), by = 1)],
+                         breaks = new_years[seq(1, length(new_years), by = gap+1)],
+                         labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap+1)]
+      ) 
+    }
+    
+    sii_plot
+  }
+})
+
+output$sii_hover_info <- renderUI({ # code from https://gitlab.com/-/snippets/16220
+  req(inequals_summarydata())
+  req(input$plot_hover2)
+  hover2 <- input$plot_hover2
+  point2 <- nearPoints(inequals_summarydata(), hover2, threshold = 5, maxpoints = 1, addDist = TRUE) # threshold was 50
+  if (nrow(point2) == 0) return(NULL)
+  
+  # get distance from left and bottom side of the image in pixels
+  left_px2 <- hover2$coords_css$x
+  top_px2 <- hover2$coords_css$y
+  
+  # create style property for tooltip
+  # background color is set so tooltip is a bit transparent (phs-magenta-30)
+  # z-index is set so we are sure are tooltip will be on top
+  style <- paste0("position:absolute; z-index:100; pointer-events:none; opacity: 0.9; 
+                   background-color: #EEC4BA; ",
+                  "left:", left_px2+2, "px; top:", top_px2+2, "px;")
+  
+  # actual tooltip created as wellPanel 
+  wellPanel(
+    style = style,
+    p(HTML(paste0("<b> Value: </b>", rnd1dp(point2$sii), "<br/>",
+                  "<b> Time period: </b>", point2$year_label)
+    )
+    )
+  )
+  
+})
+
+
+alt_text_sii <- reactive({
+  
+  text <- paste0("The x-axis displays years and the y-axis displays the absolute inequality in ", input$mhi_inequals, " (measured as the Slope Index of Inequality).
+                 The unit of measurement is the ",
+                 unique(inequals_metadata()$measure),
+                 ". The data are also presented in the table below the chart, and can be downloaded as a spreadsheet.")
+  
+  return(text)
+  
+})
+
+
+###############################################.
+## RII plot ----
+###############################################.
+
+output$simd_rii_plot <- renderPlot({
+  
+  req(inequals_summarydata())
+  
+  # Year labels for x-axis: expand and fill any gaps in the series 
+  
+  if(nrow(inequals_summarydata()) > 0) {
+    year_labels <- sort(unique(inequals_summarydata()$year_label)) # all the year labels in this data extract (strings)
+    max_label_chars <- max(nchar(year_labels)) # longest length of the labels
+    years <- sort(unique(inequals_summarydata()$year)) # all the numeric years in the data extract
+    gap <- ifelse(length(years)<5, 1,ifelse(length(years)<10, 2, 3)) # what spacing to use when plotting labels
+    all_years <- data.frame(years = seq(min(years), max(years), 1)) # full sequence of years from earliest to latest (as some series have gaps)
+    df <- data.frame(year_labels, years) %>%
+      merge(y = all_years, by="years", all=TRUE) %>% # if the df previously contained gaps this expands it to include all numeric years in the series 
+      # now to fill in the gaps in the year labels to correspond to the numeric years
+      mutate(next_label = lead(year_labels),
+             year_labels = case_when(is.na(year_labels) & max_label_chars==4  ~ as.character(years), # gaps in single year data can be >1 so this captures these cases
+                                     # fills in the gaps for the 9, 7 and 15 character labels (if only single gaps):
+                                     is.na(year_labels) & nchar(next_label)==4 ~ paste0(-1+as.numeric(substr(next_label, 1, 4))),
+                                     is.na(year_labels) & nchar(next_label)==9 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "-", 
+                                                                                        -1+as.numeric(substr(next_label, 6, 9))),
+                                     is.na(year_labels) & nchar(next_label)==7 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "/", 
+                                                                                        -1+as.numeric(substr(next_label, 6, 7))),
+                                     is.na(year_labels) & nchar(next_label)==15 ~ paste0(-1+as.numeric(substr(next_label, 1, 4)), "/", 
+                                                                                         -1+as.numeric(substr(next_label, 6, 7)), "-",
+                                                                                         -1+as.numeric(substr(next_label, 9, 12)), "/", 
+                                                                                         -1+as.numeric(substr(next_label, 14, 15))),
+                                     TRUE ~ year_labels))
+    
+    
+    new_years = sort(df$years)
+    new_year_labels = sort(df$year_labels)
+    new_year_labels_wrapped <- sort(gsub("-", "-\n", new_year_labels))
+  }  
+  
+  
+  #If no RII data for that period then plot message saying data is missing
+  if (all(is.na(inequals_summarydata()$rii_int)))
+  {
+    rii_plot <- ""
+    
+  } else { #If data is available then plot it
+    
+    rii_plot <- ggplot(inequals_summarydata(),
+                       aes(x = year, y = rii_int, group = sex)) +
+      geom_line(linewidth = 2 , colour = "#948DA3") +
+      geom_point(size=3, colour = "#948DA3") +
+      geom_hline(yintercept=0) +
+      theme_phs() +
+      theme(text = element_text(size=18#, family="Arial"
+                                ),
+            axis.title.y = element_text(face = "bold", size = 18, angle = 0, vjust = 0.5),
+            axis.title.x = element_text(face = "bold", size = 18),
+            axis.text.x = element_text(size = 18, colour = 'black'),
+            axis.text.y = element_text(size = 18, colour = 'black'),
+            axis.ticks.x = element_line(),
+            legend.position = "none",
+            axis.line = element_line(color = 'black'),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.grid.major.x = element_blank()) +
+      labs(alt = alt_text_rii(),
+           y = "%\nhigher (+)\nor\nlower (-)\nthan\naverage")
+    
+    #Adding confidence intervals depending on user input
+    if (input$ci_inequals == TRUE) {
+      rii_plot <- rii_plot +
+        geom_ribbon(aes(ymin=lowci_rii_int, ymax=upci_rii_int), fill="#4B999D", alpha=0.1, colour=NA)   
+      
+    } else { rii_plot }
+    
+    #Include zero, and position axis depending on whether values are negative or positive
+    if (max(inequals_summarydata()$rii_int)<=0) {
+      rii_plot <- rii_plot +
+        scale_y_continuous(limits=c(NA, 0),
+                           expand = expansion(mult = c(0.1, 0)),
+                           labels = scales::comma) +
+        scale_x_continuous("Year",
+                           expand = expansion(mult = c(0.1, 0.1)),
+                           minor_breaks = new_years[seq(1, length(new_years), by = 1)],
+                           breaks = new_years[seq(1, length(new_years), by = gap+1)],
+                           labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap+1)],
+                           position = "top") 
+      
+    } else if (min(inequals_summarydata()$rii_int)>=0) {
+      rii_plot <- rii_plot +
+        scale_y_continuous(limits=c(0, NA),
+                           expand = expansion(mult = c(0, 0.1)),
+                           labels = scales::comma) +
+        scale_x_continuous("Year",
+                           expand = expansion(mult = c(0.1, 0.1)),
+                           minor_breaks = new_years[seq(1, length(new_years), by = 1)],
+                           breaks = new_years[seq(1, length(new_years), by = gap+1)],
+                           labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap+1)]) 
+      
+    } else { rii_plot <- rii_plot +
+      scale_y_continuous(expand = expansion(mult = c(0.1, 0.1)),
+                         labels = scales::comma) +
+      scale_x_continuous("Year",
+                         expand = expansion(mult = c(0.1, 0.1)),
+                         minor_breaks = new_years[seq(1, length(new_years), by = 1)],
+                         breaks = new_years[seq(1, length(new_years), by = gap+1)],
+                         labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap+1)],
+                         position = "top") 
+    }
+    
+    
+    rii_plot
+  }
+})
+
+output$rii_hover_info <- renderUI({ # code from https://gitlab.com/-/snippets/16220
+  req(inequals_summarydata())
+  req(input$plot_hover3)
+  hover3 <- input$plot_hover3
+  point3 <- nearPoints(inequals_summarydata(), hover3, threshold = 5, maxpoints = 1, addDist = TRUE) # threshold was 50
+  if (nrow(point3) == 0) return(NULL)
+  
+  # get distance from left and bottom side of the image in pixels
+  left_px3 <- hover3$coords_css$x
+  top_px3 <- hover3$coords_css$y
+  
+  # create style property for tooltip
+  # background color is set so tooltip is a bit transparent (phs-magenta-30)
+  # z-index is set so we are sure are tooltip will be on top
+  style <- paste0("position:absolute; z-index:100; pointer-events:none; opacity: 0.9; 
+                   background-color: #DFDDE3; ",
+                  "left:", left_px3+2, "px; top:", top_px3+2, "px;")
+  
+  # actual tooltip created as wellPanel (drop detail here, apart from time period?)
+  wellPanel(
+    style = style,
+    p(HTML(paste0("<b> Value: </b>", rnd1dp(point3$rii_int), "<br/>",
+                  "<b> Time period: </b>", point3$year_label)
+    )
+    )
+  )
+  
+})
+
+alt_text_rii <- reactive({
+  
+  text <- paste0("The x-axis displays years and the y-axis displays the relativee inequality in ", input$mhi_inequals, " (measured as the Relative Index of Inequality).
+                 The unit of measurement is percentage difference from the Scotland average. 
+                 The data are also presented in the table below the chart, and can be downloaded as a spreadsheet.")
+  
+  return(text)
+  
+})
+
+
+
+###############################################.
 ## Reactive data for table ----
 ###############################################.
 
-table_data <- reactive ({
+inequals_table_data <- reactive ({
   
   df <- inequals_trenddata() %>%
+    filter(spatial.scale %in% c("SIMD", "Scotland")) %>%
+    merge(y=inequals_summarydata(), by=c("sex", "year_label", "year")) %>%
     dplyr::mutate(value = sprintf(rnd1dp(value), fmt = '%#.1f'),
-                  lower_ci = sprintf(rnd1dp(lower_ci), fmt = '%#.1f'),
-                  upper_ci = sprintf(rnd1dp(upper_ci), fmt = '%#.1f')) %>% 
-    arrange(year_label, spatial.unit) %>%
-    select("Area type" = spatial.scale,
-            Area = spatial.unit, 
-            Sex = sex, 
-            "Time period" = year_label,  
-            Value = value, 
-            "Lower 95% CI" = lower_ci,
-            "Upper 95% CI" = upper_ci)
-  })
+                  rii = sprintf(rnd1dp(rii), fmt = '%#.2f'),
+                  sii = sprintf(rnd1dp(sii), fmt = '%#.1f')
+    ) %>% 
+    select("Time period" = year_label, 
+           Sex = sex, 
+           "SIMD quintile/Scotland" = spatial.unit,  
+           Value = value, 
+           "Slope Index of Inequality (SII)" = sii, 
+           "Relative Index of Inequality (RII)" = rii)  
+})
 
 ###############################################.
 ## Table ----
 ###############################################.
 
-#display table based on selection made by user 
-output$trend_table <- DT::renderDataTable({
-  if (nrow(table_data()) > 0) {
-    DT::datatable(table_data(),
+#display table based on selection made by user on indicator tab
+output$inequals_table <- DT::renderDataTable({
+  if (nrow(inequals_table_data()) > 0) {
+    
+    DT::datatable(inequals_table_data(),
                   rownames = FALSE,
                   options = list(dom = 'ltip', # puts page length menu before the table, and the info and pagination sections after
                                  pageLength = 15, 
-                                 lengthMenu = list(c(5, 15, -1), c("5", "15", "All")), 
-                                 # columnDefs = list(list(className = 'dt-right', targets = 3:5), # right align the numeric columns
-                                 #                   list(targets=c(0), visible=TRUE, width='300'),
-                                 #                   list(targets=c(1), visible=TRUE, width='90'),
-                                 #                   list(targets=c(2), visible=TRUE, width='90'),
-                                 #                   list(targets=c(3), visible=TRUE, width='90'),
-                                 #                   list(targets=c(4), visible=TRUE, width='90'),
-                                 #                   list(targets=c(5), visible=TRUE, width='90')), # attempt to even out column widths. worked a bit. 
+                                 lengthMenu = list(c(6, 15, -1), c("6", "15", "All")), 
                                  autoWidth = TRUE,
                                  initComplete = JS(
                                    "function(settings, json) {",
                                    "$(this.api().table().header()).css({'background-color': '#ECEBF3', 'color': '#3F3685'});",
                                    "}")
                   )
-    )}
+    )
+  }
+  
 })
+
 
 ###############################################.
 ## More info table ----
 ###############################################.
 
 #display metadata table
-output$trend_metatable <- DT::renderDataTable({
-  if (nrow(trend_metadata()) > 0) {
+output$inequals_metatable <- DT::renderDataTable({
+  if (nrow(inequals_metadata()) > 0) {
 
-    df <- trend_metadata() %>%
+    df <- inequals_metadata() %>%
       select("Indicator name" = ind_name,
              "Indicator definition" = long_definition,
            #  Source = source_url,
@@ -745,69 +912,13 @@ output$trend_metatable <- DT::renderDataTable({
 } , escape = FALSE)
 
 
-# output$trend_metatable <- renderReactable({
-#   
-#   if (nrow(trend_metadata()) > 0) {
-#     
-#     df <- trend_metadata() %>%
-#       select("Indicator name" = ind_name, 
-#              "Indicator definition" = long_definition, 
-#              Source = source_url, 
-#              Numerator = numerator, 
-#              Denominator = denominator, 
-#              Measure = measure, 
-#              Weighting = weighted, 
-#              "Confidence intervals" = conf_intervals, 
-#              "Disclosure control" = suppression, 
-#              Sex = sexes, 
-#              "Time period" = years, 
-#              Geographies = geogs, 
-#              SIMD = simd) %>%
-#       pivot_longer(-"Indicator name", names_to = "char", values_to = "info") %>%
-#       select(-"Indicator name") %>%
-#       mutate(info = gsub("<b>Source: </b>", "", info))
-#     
-#   
-#     js_style <- JS("
-#     function(rowInfo) {
-#       return {fontWeight: 'bold' }
-#     }
-#   ")
-#     
-#   reactable(
-#     df, 
-#     defaultPageSize = 25, # set max number of rows per page
-#   #  theme = table_theme(), # table_theme() can be found in table functions
-#     rowStyle = list(cursor = "pointer"),
-#     highlight = TRUE, # changes row colour when user hovers over it
-#     # Customising all the columns in the table:
-#     columns = list(
-#       # Column 1: Indicator name 
-#       char = colDef(
-#         #minWidth = 350,
-#         show = TRUE, 
-#         html = TRUE, 
-#         name = "",
-#         #style = list(fontWeight=600)
-#         style = js_style),
-#       info = colDef(
-#         #minWidth = 350,
-#         show = TRUE, 
-#         html = TRUE, 
-#         name = ""))
-#     )
-#   }
-# })
-# 
-#                      
-
 #####################################.    
 #### Excel download of data extract table ----
 ####################################.
 
-output$trend_dnld <- downloadHandler(
-  
-  filename = paste("Adult_MHI_inequals_trenddata_", Sys.Date(), ".xlsx", sep = ""),
+output$inequals_dnld <- downloadHandler(
+  mydate <- Sys.Date(),
+  filename = paste("Adult_MHI_inequals_data_", mydate, ".xlsx", sep = ""),
   
   content = function(file) {
     
@@ -817,6 +928,8 @@ output$trend_dnld <- downloadHandler(
     addWorksheet(wb, "Introduction", gridLines = FALSE)
     #adding a new worksheet 
     addWorksheet(wb, "Indicator information", gridLines = FALSE)
+    #adding a new worksheet 
+    addWorksheet(wb, "Health inequality measures", gridLines = FALSE)
     #adding a new worksheet 
     addWorksheet(wb, "Data extract", gridLines = FALSE)
     
@@ -836,8 +949,9 @@ output$trend_dnld <- downloadHandler(
       "", # row 14
       "",
       "",
+      "",
       "More information about the Mental Health Indicators project:",
-      "", # row 18
+      "", # row 19
       "",
       "",
       "",
@@ -848,6 +962,7 @@ output$trend_dnld <- downloadHandler(
       ""
     )
     writeData(wb, "Introduction", x = df, startRow = 7, startCol = 2)
+    
     #external links
     link <- c("https://scotland.shinyapps.io/phs-adult-mhi-dashboard/") 
     names(link) <- c("Link to the Adult Mental Health Indicators dashboard")
@@ -857,8 +972,11 @@ output$trend_dnld <- downloadHandler(
     ## Internal Link- Text to display
     writeFormula(wb, "Introduction", startRow = 14,  startCol = 2,
                  x = makeHyperlinkString(sheet = "Indicator information", row = 1, col = 2,
-                                         text = "Indicator information (for the selected indicator(s))"))
+                                         text = "Indicator information (for the selected indicator)"))
     writeFormula(wb, "Introduction", startRow = 15,  startCol = 2,
+                 x = makeHyperlinkString(sheet = "Health inequality measures", row = 1, col = 2,
+                                         text = "Health inequality measures"))
+    writeFormula(wb, "Introduction", startRow = 16,  startCol = 2,
                  x = makeHyperlinkString(sheet = "Data extract", row = 1, col = 2,
                                          text = "Data extract (based on user-specified options)"))
     #external links
@@ -869,7 +987,7 @@ output$trend_dnld <- downloadHandler(
                   "Online adult Mental Health Indicators dashboard",
                   "Contact us")
     class(x) <- "hyperlink"
-    writeData(wb, sheet = "Introduction", x = x, startRow = 18, startCol = 2)        
+    writeData(wb, sheet = "Introduction", x = x, startRow = 19, startCol = 2)        
     addStyle(wb, "Introduction", general_style_wrap, rows=5:50, cols=2, gridExpand = TRUE, stack = TRUE)
     addStyle(wb, "Introduction", heading2_style, rows=c(5), cols=c(2), gridExpand = FALSE, stack = FALSE)
     
@@ -879,6 +997,7 @@ output$trend_dnld <- downloadHandler(
     writeData(wb, "Indicator information", x = "Indicator information", startRow = 1, startCol = 2)
     mergeCells(wb, "Indicator information", cols = 2:3, rows = 1)
     addStyle(wb, "Indicator information", heading1_style, rows=1, cols=2, gridExpand = FALSE, stack = TRUE)
+    
     writeData(wb, "Indicator information", x = matrix(c("Attribute", "Detail"), 
                                                       nrow=1, ncol=2), startRow = 3, startCol = 2, 
               colNames = FALSE, rowNames = FALSE, headerStyle = NULL,
@@ -888,41 +1007,40 @@ output$trend_dnld <- downloadHandler(
               withFilter = FALSE, keepNA = FALSE, name = NULL, sep = ",")
     
     writeData(wb, "Indicator information", x = "Indicator name", startRow = 4, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$ind_name), startRow = 4, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$ind_name), startRow = 4, startCol = 3)
     
     writeData(wb, "Indicator information", x = "Definition", startRow = 5, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$long_definition), startRow = 5, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$long_definition), startRow = 5, startCol = 3)
     
     writeData(wb, "Indicator information", x = "MHI domain", startRow = 6, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$domain), startRow = 6, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$domain), startRow = 6, startCol = 3)
     
     writeData(wb, "Indicator information", x = "MHI construct", startRow = 7, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$construct), startRow = 7, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$construct), startRow = 7, startCol = 3)
     
     writeData(wb, "Indicator information", x = "Source", startRow = 8, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$source), startRow = 8, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$source), startRow = 8, startCol = 3)
     
     writeData(wb, "Indicator information", x = "Units", startRow = 9, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$measure), startRow = 9, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$measure), startRow = 9, startCol = 3)
     
     writeData(wb, "Indicator information", x = "Numerator", startRow = 10, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$numerator), startRow = 10, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$numerator), startRow = 10, startCol = 3)
     
     writeData(wb, "Indicator information", x = "Denominator", startRow = 11, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$denominator), startRow = 11, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$denominator), startRow = 11, startCol = 3)
     
     writeData(wb, "Indicator information", x = "Weighting", startRow = 12, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$weighted), startRow = 12, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$weighted), startRow = 12, startCol = 3)
     
     writeData(wb, "Indicator information", x = "Standardisation", startRow = 13, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$standardised), startRow = 13, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$standardised), startRow = 13, startCol = 3)
     
     writeData(wb, "Indicator information", x = "Confidence intervals", startRow = 14, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$conf_intervals), startRow = 14, startCol = 3)
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$conf_intervals), startRow = 14, startCol = 3)
     
     writeData(wb, "Indicator information", x = "Suppression", startRow = 15, startCol = 2)
-    writeData(wb, "Indicator information", x = unique(trend_metadata()$suppression), startRow = 15, startCol = 3)
-    
+    writeData(wb, "Indicator information", x = unique(inequals_metadata()$suppression), startRow = 15, startCol = 3)
     
     setColWidths(wb, "Indicator information", cols=1:3, widths = c(3, 50, 108)) ## set column width for row names column
     addStyle(wb, "Indicator information", heading2_shade_style, rows=3, cols=2:3, gridExpand = TRUE, stack = TRUE)
@@ -931,21 +1049,88 @@ output$trend_dnld <- downloadHandler(
     addStyle(wb, "Indicator information", border_style, rows=c(4:15), cols=2:3, gridExpand = TRUE, stack = TRUE)  
     
     
+    # populate the health inequality measures worksheet
+    writeData(wb, "Health inequality measures", x = "Health inequality measures", startRow = 1, startCol = 2)
+    mergeCells(wb, "Health inequality measures", cols = 2:3, rows = 1)
+    addStyle(wb, "Health inequality measures", heading1_style, rows=1, cols=2, gridExpand = FALSE, stack = TRUE)
+    
+    #external links
+    link <- c("https://www.scotpho.org.uk/methods-and-data/measuring-health-inequalities/") 
+    names(link) <- c("More information about these measures can be found on the ScotPHO website.")
+    class(link) <- "hyperlink"
+    writeData(wb, sheet = "Health inequality measures", x = link, startRow = 2, startCol = 2)    
+    
+    writeData(wb, "Health inequality measures", x = matrix(c("Measure", "Description"), 
+                                                           nrow=1, ncol=2), startRow = 4, startCol = 2, 
+              colNames = FALSE, rowNames = FALSE, headerStyle = NULL,
+              borders = c("surrounding"),
+              borderColour = getOption("openxlsx.borderColour", "black"),
+              borderStyle = getOption("openxlsx.borderStyle", "thin"),
+              withFilter = FALSE, keepNA = FALSE, name = NULL, sep = ",")
+    
+    writeData(wb, "Health inequality measures", x = "Absolute range", startRow = 5, startCol = 2)
+    writeData(wb, "Health inequality measures", 
+              x = "The absolute difference between the values in the most and least deprived quintiles.",
+              startRow = 5, startCol = 3)
+    
+    writeData(wb, "Health inequality measures", x = "Relative range", startRow = 6, startCol = 2)
+    writeData(wb, "Health inequality measures", 
+              x = "The relative difference in the values in the most and least deprived quintiles, calculated as the value in the most deprived quintile divided by the value in the least deprived quintile.", 
+              startRow = 6, startCol = 3)
+    
+    writeData(wb, "Health inequality measures", x = "Slope Index of Inequality (SII)", startRow = 7, startCol = 2)
+    writeData(wb, "Health inequality measures", 
+              x = "An absolute measure of health inequality that takes into account health across all deprivation quintiles, and each quintile's share of the overall population. It is calculated using linear regression, and measured in the units of the health outcome. It is interpreted as the difference in the health outcome between the most and the least deprived datazones.", 
+              startRow = 7, startCol = 3)
+    
+    writeData(wb, "Health inequality measures", x = "Relative Index of Inequality (RII)", startRow = 8, startCol = 2)
+    writeData(wb, "Health inequality measures", 
+              x = "A relative measure of health inequality based on the SII, and calculated by dividing the SII by the population average value for the health outcome. For ease of interpretation we expressed the RII relative to the Scottish average for the health outcome, by dividing it by 2 and multiplying by 100. The resulting RII_vs_Scot value shows the % difference between the health outcome in the most deprived area and the Scottish average.", 
+              startRow = 8, startCol = 3)
+    
+    setColWidths(wb, "Health inequality measures", cols=1:3, widths = c(3, 40, 110)) ## set column width for row names column
+    addStyle(wb, "Health inequality measures", heading3_style, rows=c(5:8), cols=2, gridExpand = TRUE, stack = FALSE)
+    addStyle(wb, "Health inequality measures", general_style_wrap, rows=c(5:8), cols=3, gridExpand = TRUE, stack = TRUE)
+    addStyle(wb, "Health inequality measures", border_style, rows=c(4:8), cols=2:3, gridExpand = TRUE, stack = TRUE)  
+    addStyle(wb, "Health inequality measures", heading2_shade_style, rows=4, cols=2:3, gridExpand = TRUE, stack = TRUE)
+    
+    
     # populating the Data extract worksheet
+    # download_data <- inequals_data() %>%
+    #   dplyr:: mutate(Nuw = rnd(Nuw)) %>%
+    #   dplyr::mutate(across(c(value, lower_ci, upper_ci, 
+    #                          abs_range,rel_range,
+    #                          sii,lowci_sii, upci_sii,
+    #                          rii,lowci_rii,upci_rii,
+    #                          rii_int,lowci_rii_int,upci_rii_int), rnd1dp)) %>%
+    #   select(Indicator = ind_name, Year = year_label, Sex = sex, "SIMD quintile or Scotland" = spatial.unit, Units = measure, "Unweighted base" = Nuw,
+    #          Value = value, "Lower CI" = lower_ci, "Upper CI" = upper_ci,
+    #          "Absolute range" = abs_range, "Relative range" = rel_range, 
+    #          "Slope Index of Inequality (SII)" = sii, "Lower SII CI" = lowci_sii, "Upper SII CI" = upci_sii,
+    #          "Relative Index of Inequality (RII)" = rii, "Lower RII CI" = lowci_rii, "Upper RII CI" = upci_rii,
+    #          "RII_vs_Scot" = rii_int, "Lower RII_vs_Scot CI" = lowci_rii_int, "Upper RII_vs_Scot CI" = upci_rii_int) %>%
+    #   arrange(Year, "SIMD quintile or Scotland")
+    
+    
     download_data <- inequals_trenddata() %>%
-      merge(y=trend_metadata(), by="ind_name", all.x=TRUE) %>%
-      dplyr::mutate(value = rnd1dp(value),
-                    lower_ci = rnd1dp(lower_ci),
-                    upper_ci = rnd1dp(upper_ci),
-                    Nuw = rnd(Nuw)) %>%
-      dplyr::mutate(Geography = case_when(spatial.scale=="HB" ~ "Health Board",
-                                          spatial.scale=="LA" ~ "Council Area",
-                                          spatial.scale=="PD" ~ "Police Division",
-                                          spatial.scale=="LA" ~ "Council Area",
-                                          TRUE ~ spatial.scale)) %>%
-      select(Indicator = ind_name, Year = year_label, Sex = sex, Geography, Area = spatial.unit, Units = measure,
-             Value = value, "Lower CI" = lower_ci, "Upper CI" = upper_ci, "Unweighted base" = Nuw) %>%
-      arrange(Geography, Area, Year)
+      filter(spatial.scale %in% c("SIMD", "Scotland")) %>%
+      merge(y=inequals_summarydata(), by=c("sex", "year_label", "year")) %>%
+      merge(y=inequals_metadata(), by="ind_name") %>%
+      dplyr:: mutate(Nuw = rnd(Nuw)) %>%
+      dplyr::mutate(across(c(value, lower_ci, upper_ci, 
+                             abs_range,rel_range,
+                             sii,lowci_sii, upci_sii,
+                             rii,lowci_rii,upci_rii,
+                             rii_int,lowci_rii_int,upci_rii_int), rnd1dp)) %>%
+      select(Indicator = ind_name, Year = year_label, Sex = sex, "SIMD quintile or Scotland" = spatial.unit, 
+             Units = measure, "Unweighted base" = Nuw,
+             Value = value, "Lower CI" = lower_ci, "Upper CI" = upper_ci,
+             "Absolute range" = abs_range, "Relative range" = rel_range, 
+             "Slope Index of Inequality (SII)" = sii, "Lower SII CI" = lowci_sii, "Upper SII CI" = upci_sii,
+             "Relative Index of Inequality (RII)" = rii, "Lower RII CI" = lowci_rii, "Upper RII CI" = upci_rii,
+             "RII_vs_Scot" = rii_int, "Lower RII_vs_Scot CI" = lowci_rii_int, "Upper RII_vs_Scot CI" = upci_rii_int) %>%
+      arrange(Year, "SIMD quintile or Scotland")
+    
     
     writeData(wb, "Data extract", x = "Data extract", startRow = 1, startCol = 2)
     mergeCells(wb, "Data extract", cols = 2:3, rows = 1)
@@ -958,17 +1143,15 @@ output$trend_dnld <- downloadHandler(
               withFilter = FALSE, keepNA = FALSE, name = NULL, sep = ",")
     datalength <- nrow(download_data)
     numcols <- ncol(download_data)
-    addStyle(wb, "Data extract", heading2_shade_style, rows=3, cols=1:numcols+1, gridExpand = TRUE, stack = TRUE)
+    addStyle(wb, "Data extract", heading2_shade_style_wrap, rows=3, cols=1:numcols+1, gridExpand = TRUE, stack = TRUE)
     addStyle(wb, "Data extract", general_style_wrap, rows=4:(datalength+3), cols=1:numcols+1, gridExpand = TRUE, stack = FALSE)
     addStyle(wb, "Data extract", border_style, rows=4:(datalength+3), cols=1:numcols+1, gridExpand = TRUE, stack = TRUE)
     #    addStyle(wb, "Data extract", integers, rows=4:(datalength+4), cols=c(10,15,16), gridExpand = TRUE, stack = TRUE)
     #    addStyle(wb, "Data extract", dp3, rows=4:(datalength+4), cols=c(11,12,14), gridExpand = TRUE, stack = TRUE)
     setColWidths(wb, "Data extract", cols=1, widths = 3) 
     setColWidths(wb, "Data extract", cols=2, widths = 70) 
-    setColWidths(wb, "Data extract", cols=c(3, 4, 8, 9, 10), widths = 11) 
-    setColWidths(wb, "Data extract", cols=5, widths = 14) 
-    setColWidths(wb, "Data extract", cols=c(11), widths = 23) 
-    setColWidths(wb, "Data extract", cols=c(6, 7), widths = 50) 
+    setColWidths(wb, "Data extract", cols=c(3, 4, 7:22), widths = 16) 
+    setColWidths(wb, "Data extract", cols=c(5, 6), widths = 50) 
     
     #saving the workbook  
     saveWorkbook(wb, file, overwrite = TRUE)

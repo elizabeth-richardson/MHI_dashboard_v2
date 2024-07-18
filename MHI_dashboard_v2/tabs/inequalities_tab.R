@@ -17,8 +17,7 @@ inequalities_tab <- function() {
         gap = NULL,
         bg = "white",
         accordion(
-          multiple = TRUE, # allow multiple panels to be open at once
-          
+
           # accordion panel with indicator filter
           accordion_panel(
             value = "indicator_filter_panel",
@@ -34,46 +33,48 @@ inequalities_tab <- function() {
         full_screen = TRUE,
         
         # charts tab -----------------------
-        nav_panel("Chart", 
+        nav_panel("Charts", 
+                 # card(
                   uiOutput("title_inequals"),
+                  
+                  uiOutput("plot1_title"), 
                   div(style = "position:relative", 
-                      plotOutput("inequals_plot", 
-                                 hover = hoverOpts("plot_hover", delay = 500, delayType = "throttle")) %>%
+                      plotOutput("simd_trend_plot", 
+                                 hover = hoverOpts("plot_hover1", delay = 500, delayType = "throttle")) %>%
                         withSpinner(color = '#655E9D', type=4),
-                      uiOutput("inequals_hover_info"))
+                      uiOutput("inequals_hover_info")),
                   
+                  layout_columns(
+                    card(uiOutput("plot2_title"), 
+                       div(style = "position:relative",
+                           plotOutput("simd_sii_plot",
+                                      hover = hoverOpts("plot_hover2", delay = 500, delayType = "throttle")) %>%
+                             withSpinner(color = '#655E9D', type=4),
+                           uiOutput("sii_hover_info")
+                      )),
                   
-                  # # MORE STACKED CHARTS:
-                  # textOutput("plot2_title"),
-                  # uiOutput("narrative_inequals_abs", style="text-align: left"),
-                  # uiOutput("narrative_inequals_rel", style="text-align: left"),
-                  # uiOutput("help_sii_button"),
-                  # uiOutput("help_rii_button"),
-                  # (style = "position:relative",
-                  #                 plotOutput("simd_sii_plot",
-                  #                            hover = hoverOpts("plot_hover2", delay = 500, delayType = "throttle")) %>%
-                  #                   withSpinner(color = '#655E9D', type=4),
-                  #                 uiOutput("sii_hover_info")
-                  #          ),
-                  # (style = "position:relative",
-                  #                 plotOutput("simd_rii_plot",
-                  #                            hover = hoverOpts("plot_hover3", delay = 500, delayType = "throttle")) %>%
-                  #                   withSpinner(color = '#655E9D', type=4),
-                  #                 uiOutput("rii_hover_info")
-                  #          )
-                  # 
-                  ),
-        
+                    card(uiOutput("plot3_title"), 
+                       div(style = "position:relative",
+                           plotOutput("simd_rii_plot",
+                                      hover = hoverOpts("plot_hover3", delay = 500, delayType = "throttle")) %>%
+                             withSpinner(color = '#655E9D', type=4),
+                           uiOutput("rii_hover_info")
+                  ))
+                  )
+          #)
+          ),
+                     
+
         # data tab ------------------
         nav_panel("Data", 
-                  uiOutput("data_inequals"),
-                  DT::dataTableOutput("inequals_table")
+                  card(uiOutput("data_inequals"),
+                  DT::dataTableOutput("inequals_table"))
         ),
         
         # definition, source and methodological info tab ----------------
         nav_panel("More info", 
-                  uiOutput("metadata_inequals"),
-                  DT::dataTableOutput("inequals_metatable")
+                  card(uiOutput("metadata_inequals"),
+                  DT::dataTableOutput("inequals_metatable"))
                   
         ),
         

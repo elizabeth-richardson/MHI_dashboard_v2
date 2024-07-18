@@ -105,7 +105,8 @@ all_data <- setDT(arrow::read_parquet("data/all_data.parquet"))
 
 db_metadata <- setDT(arrow::read_parquet("data/metadata.parquet")) 
 
-ineq_data <- setDT(arrow::read_parquet("data/ineq_data.parquet")) 
+ineq_data <- setDT(arrow::read_parquet("data/ineq_data.parquet")) %>%
+  filter(!is.na(year))
 
 last_update <- as.character(db_metadata %>% 
                               group_by(last_update) %>% 
@@ -161,34 +162,37 @@ mhi_trend <- selectInput("mhi_trend",
                                           `Structural determinants:` = sort(struc_names))), 
                          multiple = FALSE)
 
+scotname_trend <- checkboxInput("scotname_trend", label = "Scotland", value = TRUE)
+
 hbname_trend <- selectInput("hbname_trend", 
                             label = "Select Health Board(s):", 
                             choices = c(
-                              #"Select HBs" = "", 
-                              paste(hb_names)),
+                              paste(hb_names), ""),
                             multiple=TRUE, selected = "")
 
 caname_trend <- selectInput("caname_trend", 
                             label = "Select Council Area(s):", 
                             choices =  c(
-                              #"Select CAs" = "", 
-                              paste(la_names)),
+                              paste(la_names), ""),
                             multiple=TRUE, selected = "")
 
 pdname_trend <- selectInput("pdname_trend", 
                             label = "Select Police Division(s):", 
                             choices =  c(
-                              #"Select PDs" = "", 
-                              paste(pd_names)),
+                              paste(pd_names), ""),
                             multiple=TRUE, selected = "")
 
 sex_trend <- selectInput("sex_trend",
                          label = "Select sex:",
                          choices = c(
                            "Total (Males and Females)" = "Total", "Females" = "Female", "Males" = "Male"),
-                         multiple = FALSE,
-                         selected = "Total"
-)
+                         multiple = FALSE)
+
+# ci switch
+ci_trend <- checkboxInput("ci_trend", label = "95% confidence intervals", value = FALSE)
+
+# zero constraint
+zero_trend <- checkboxInput("zero_trend", label = "y-axis should include zero", value = TRUE)
 
 # Filters
 mhi_inequals_sex <- selectInput("mhi_inequals_sex", 
@@ -212,8 +216,8 @@ sex_inequals <- selectInput("sex_inequals",
                          label = "Select sex:",
                          choices = c(
                            "Total (Males and Females)" = "Total", "Females" = "Female", "Males" = "Male"),
-                         multiple = FALSE,
-                         selected = "Total")
+                         multiple = FALSE
+                     )
                          
                          
 # # cookie box to appear along the top of dashboard

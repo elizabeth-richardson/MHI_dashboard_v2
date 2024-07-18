@@ -64,12 +64,12 @@ page_navbar(
   #                         )),
   
     # home tab -------------------------------------------------------------------
-  nav_panel("Home (ScotPHO)",
+  nav_panel(HTML("<b><big>Home (ScotPHO)</big></b>"),
             value = "home"
   ),
   
   navbarMenu(
-    title = "Mental health  profile",
+    title = HTML("<b><big>Mental health  profile</big></b>"),
     
     # Health and wellbeing
     nav_panel(value = "adults",
@@ -86,7 +86,7 @@ page_navbar(
                 nav_panel(title = "Rank"#, plotOutput("body_mass")
                 ),  
                 nav_panel(title = "Sex", sex_tab()
-                ),
+                )
                 
               )),
     
@@ -95,15 +95,9 @@ page_navbar(
     nav_panel(value = "CYP",
               title = "Children and young people",
               navset_tab(
-                nav_panel(title = "Summary"#, summary_table_ui("cyp_summary")
-                ),
-                nav_panel(title = "Trends"#, trend_mod_ui("cyp_trends")
-                ),
-                nav_panel(title = "Rank"#, rank_mod_ui("cyp_rank")
-                ),
-                nav_panel(title = "Deprivation"#, simd_navpanel_ui("cyp_simd")
+                nav_panel(title = "This profile is currently in development.")
                 )
-              ))
+              )
   ),
   
   nav_spacer(),

@@ -23,79 +23,158 @@
 # Dynamic filters
 #######################################################
 
-# enable/ disable geography filters and update the filter labels,
-# depending on what indicator was selected
- observe( {
+# # enable/ disable geography filters and update the filter labels,
+# # depending on what indicator was selected
+#  shiny::observe( {
+# 
+#    req(input$mhi_trend)
+# 
+#    shinyjs::useShinyjs()
+# 
+#   # stores available areatypes, depending on what indicator was selected
+#   available_areatypes <- (all_data %>%
+#                             subset(ind_name == input$mhi_trend) %>%
+#                             summarise(spatial.scale = unique(spatial.scale)))[['spatial.scale']]
+# 
+#     available_sex <- (all_data %>%
+#                       subset(ind_name == input$mhi_trend) %>%
+#                       summarise(sex = unique(sex)))[["sex"]]
+# 
+#   available_ci <- all_data %>%
+#     subset(ind_name == input$mhi_trend) %>%
+#     select(lower_ci)
+# 
+# 
+#   # If 'HB' is available, enable hbname_trend, otherwise disable it
+#   if("HB" %in% available_areatypes) {
+#     shinyjs::enable("hbname_trend")
+#     updateSelectInput(session, "hbname_trend")
+#   } else {
+#     shinyjs::disable("hbname_trend")
+#     updateSelectInput(session, "hbname_trend",
+#                       choices = c("HBs not available" = ""))
+#   }
+# 
+#   # If 'CA' is available, enable caname_trend, otherwise disable it
+#   if("CA" %in% available_areatypes) {
+#     shinyjs::enable("caname_trend")
+#     updateSelectInput(session, "caname_trend")
+#   } else {
+#     shinyjs::disable("caname_trend")
+#     updateSelectInput(session, "caname_trend",
+#                       choices = c("CAs not available" = ""))
+#   }
+# 
+#   # If 'PD' is available, enable pdname_trend, otherwise disable it
+#   if("PD" %in% available_areatypes) {
+#     shinyjs::enable("pdname_trend")
+#     updateSelectInput(session, "pdname_trend")
+#   } else {
+#     shinyjs::disable("pdname_trend")
+#     updateSelectInput(session, "pdname_trend",
+#                       choices = c("PDs not available" = ""))
+#   }
+# 
+#   # If female and male data are available, enable sex_trend filter, otherwise disable it
+#   if("Female" %in% available_sex) {
+#     shinyjs::enable("sex_trend")
+#     updateSelectInput(session, "sex_trend", selected = "Total")
+#   } else {
+#     shinyjs::disable("sex_trend")
+#     updateSelectInput(session, "sex_trend", choices = c("Total (Males and Females)" = ""))
+#   }
+# 
+# 
+#   # Disabling and unchecking CI option if no CIs available
+#   if (all(is.na(available_ci$lower_ci)) == TRUE) {
+#     shinyjs::disable("ci_trend")
+#     checkboxInput(session, "ci_trend", value = FALSE)
+#   } else {
+#     shinyjs::enable("ci_trend")
+#   }
+# 
+# }
+# )
 
-   req(input$mhi_trend)
 
-   shinyjs::useShinyjs()
 
+# reset filters once the indicator has changed
+observeEvent(input$mhi_trend, { #actions to take only once mhi_trend has changed
+  
+  shinyjs::useShinyjs()
+  
   # stores available areatypes, depending on what indicator was selected
   available_areatypes <- (all_data %>%
                             subset(ind_name == input$mhi_trend) %>%
                             summarise(spatial.scale = unique(spatial.scale)))[['spatial.scale']]
-
-    available_sex <- (all_data %>%
+  
+  available_sex <- (all_data %>%
                       subset(ind_name == input$mhi_trend) %>%
                       summarise(sex = unique(sex)))[["sex"]]
-
+  
   available_ci <- all_data %>%
     subset(ind_name == input$mhi_trend) %>%
     select(lower_ci)
-
-
+  
+  shinyjs::enable("scotname_trend")
+  updateCheckboxInput(session, "scotname_trend", value = TRUE)
+  
   # If 'HB' is available, enable hbname_trend, otherwise disable it
   if("HB" %in% available_areatypes) {
     shinyjs::enable("hbname_trend")
-    updateSelectInput(session, "hbname_trend")
+    updateSelectInput(session, "hbname_trend", 
+                      choices = c(paste(hb_names), ""),
+                      selected = "")
   } else {
     shinyjs::disable("hbname_trend")
     updateSelectInput(session, "hbname_trend", 
                       choices = c("HBs not available" = ""))
-  }
-
-  # If 'CA' is available, enable caname_trend, otherwise disable it
-  if("CA" %in% available_areatypes) {
+ }
+  
+  # If 'LA' is available, enable caname_trend, otherwise disable it
+  if("LA" %in% available_areatypes) {
     shinyjs::enable("caname_trend")
-    updateSelectInput(session, "caname_trend")
+    updateSelectInput(session, "caname_trend", 
+                      choices = c(paste(la_names), ""),
+                      selected = "")
   } else {
     shinyjs::disable("caname_trend")
     updateSelectInput(session, "caname_trend", 
                       choices = c("CAs not available" = ""))
-  }
-
+ }
+  
   # If 'PD' is available, enable pdname_trend, otherwise disable it
   if("PD" %in% available_areatypes) {
     shinyjs::enable("pdname_trend")
-    updateSelectInput(session, "pdname_trend")
+    updateSelectInput(session, "pdname_trend", 
+                      choices = c(paste(pd_names), ""),
+                      selected = "")
   } else {
     shinyjs::disable("pdname_trend")
     updateSelectInput(session, "pdname_trend", 
                       choices = c("PDs not available" = ""))
   }
-
+  
   # If female and male data are available, enable sex_trend filter, otherwise disable it
   if("Female" %in% available_sex) {
     shinyjs::enable("sex_trend")
-    updateSelectInput(session, "sex_trend")
+    updateSelectInput(session, "sex_trend", selected = "Total")
   } else {
+    updateSelectInput(session, "sex_trend", 
+                      choices = c("Total (Males and Females)" = "Total"), 
+                      selected="Total")
     shinyjs::disable("sex_trend")
-    updateSelectInput(session, "sex_trend", choices = c("Total (Males and Females)" = ""))
   }
-
-
-  # Disabling and unchecking CI option if no CIs available
+  
+  # Disabling CI option if no CIs available
   if (all(is.na(available_ci$lower_ci)) == TRUE) {
     shinyjs::disable("ci_trend")
-    checkboxInput(session, "ci_trend", value = FALSE)
   } else {
     shinyjs::enable("ci_trend")
   }
-
-} 
+  
+} #, ignoreInit = TRUE
 )
-
 
 
 
@@ -107,6 +186,8 @@
 trend_data <- reactive({
   
   req(input$mhi_trend)
+  req(input$sex_trend)
+  req(isTruthy(input$scotname_trend==TRUE) || isTruthy(input$hbname_trend) || isTruthy(input$caname_trend) || isTruthy(input$pdname_trend))
   
   trend <- all_data %>%
     subset((spatial.unit %in% input$hbname_trend & spatial.scale == "HB" |
@@ -150,73 +231,68 @@ trend_metadata <- reactive({
 
 output$title_trend <- renderUI({
   
+  req(input$mhi_trend)
+  req(input$sex_trend)
+  req(trend_data())
+  
   # create dynamic text if no indicators available for selected profile
   # and geography
   shiny::validate(
     need( nrow(trend_data()) > 0, "No data available for this indicator currently. Please select another.")
   )
   
-  if(input$mhi_trend != "") {
-    indicator <- paste0(input$mhi_trend,
-                        ifelse(input$sex_trend=="Total", " (total population)", 
-                               ifelse(input$sex_trend=="Male", " (males)", " (females)") 
-           ))
-  } else {
-    indicator <- ""
-  }
+  indicator <- paste0(input$mhi_trend,
+                      ifelse(input$sex_trend=="Total", " (total population)", 
+                             ifelse(input$sex_trend=="Male", " (males)", " (females)") 
+                      ))
   
-  subtitle <- paste0("Definition: ", unique(trend_metadata()$short_definition))
+  subtitle <- HTML(paste0("<b>Definition:</b> ", unique(trend_metadata()$short_definition)))
   
+  source <- HTML(trend_metadata()$source_url)
   
-  if (!(input$mhi_trend %in% paste0(dataless, "*"))) {
-    source <- HTML(gsub("<b>Source: </b>", "Source: ", trend_metadata()$source_url))
-  } else {
-    source <- ""
-  }
+  if (length(unique(trend_data()$spatial.unit)) == 1) {
+    narrative <- HTML(sprintf("<b>Latest:</b> In %s, the %s was %.1f for the %s population of %s.", 
+                              unique(trend_data()$year_label[trend_data()$year == max(trend_data()$year)]), # year-label corresponding to latest year
+                              tolower(trend_metadata()$measure), # units
+                              trend_data()$value[trend_data()$year == max(trend_data()$year) & trend_data()$sex == input$sex_trend], #value
+                              tolower(input$sex_trend),#sex
+                              unique(trend_data()$spatial.unit) # spatial unit
+    ))
+  } else if (length(unique(trend_data()$spatial.unit)) > 1) {
+    if (min(nchar(trend_data()$year_label)) == max(nchar(trend_data()$year_label))) { # case when same time periods used throughout, for all spatial units
+      narrative <- HTML(sprintf("<b>Latest:</b> In the selected areas, the %s %s for the %s population was highest in %s (%.1f) and lowest in %s (%.1f).", 
+                                unique(trend_data()$year_label[trend_data()$year == max(trend_data()$year)]), # year-label corresponding to latest year
+                                tolower(trend_metadata()$measure), # units
+                                tolower(input$sex_trend),#sex
+                                trend_data()$spatial.unit[trend_data()$value == max(trend_data()$value[trend_data()$year == max(trend_data()$year)]) & trend_data()$year == max(trend_data()$year)], # area with highest value at latest time point
+                                max(trend_data()$value[trend_data()$year == max(trend_data()$year)]), #highest value
+                                trend_data()$spatial.unit[trend_data()$value == min(trend_data()$value[trend_data()$year == max(trend_data()$year)]) & trend_data()$year == max(trend_data()$year)], # area with lowest value at latest time point
+                                min(trend_data()$value[trend_data()$year == max(trend_data()$year)]) #lowest value
+      )
+      )
+    } else if (min(nchar(trend_data()$year_label)) != max(nchar(trend_data()$year_label))) {
+      narrative <- HTML(sprintf("<b>Latest:</b> In the latest data available for all selected areas, the %s for the %s population was highest in %s (%.1f) and lowest in %s (%.1f).", 
+                                tolower(trend_metadata()$measure), # units
+                                tolower(input$sex_trend),#sex
+                                unique(trend_data()$spatial.unit[trend_data()$value == unique(max(trend_data()$value[trend_data()$year == max(trend_data()$year[trend_data()$spatial.unit!="Scotland"])])) 
+                                                                 & trend_data()$year == max(trend_data()$year[trend_data()$spatial.unit!="Scotland"])]), # area with highest value at latest shared time point
+                                unique(max(trend_data()$value[trend_data()$year == max(trend_data()[trend_data()$spatial.unit!="Scotland"]$year)])),#, #highest value
+                                unique(trend_data()$spatial.unit[trend_data()$value == unique(min(trend_data()$value[trend_data()$year == max(trend_data()$year[trend_data()$spatial.unit!="Scotland"])])) 
+                                                                 & trend_data()$year == max(trend_data()$year[trend_data()$spatial.unit!="Scotland"])]), # area with lowest value at latest shared time point
+                                unique(min(trend_data()$value[trend_data()$year == max(trend_data()[trend_data()$spatial.unit!="Scotland"]$year)]))
+      )
+      )
+    } else { narrative <- "" }
+  } else { narrative <- "" }
   
-  narrative_trend <- if (length(unique(trend_data()$spatial.unit)) == 1) {
-      HTML(sprintf("Latest: In %s, the %s was %.1f for the %s population of %s.", 
-                   unique(trend_data()$year_label[trend_data()$year == max(trend_data()$year)]), # year-label corresponding to latest year
-                   tolower(trend_metadata()$measure), # units
-                   trend_data()$value[trend_data()$year == max(trend_data()$year) & trend_data()$sex == input$sex_trend], #value
-                   tolower(input$sex_trend),#sex
-                   unique(trend_data()$spatial.unit) # spatial unit
-      ))
-    } else if (length(unique(trend_data()$spatial.unit)) > 1) {
-      if (min(nchar(trend_data()$year_label)) == max(nchar(trend_data()$year_label))) { # case when same time periods used throughout, for all spatial units
-        HTML(sprintf("Latest: In the selected areas, the %s %s for the %s population was highest in %s (%.1f) and lowest in %s (%.1f).", 
-                     unique(trend_data()$year_label[trend_data()$year == max(trend_data()$year)]), # year-label corresponding to latest year
-                     tolower(trend_metadata()$measure), # units
-                     tolower(input$sex_trend),#sex
-                     trend_data()$spatial.unit[trend_data()$value == max(trend_data()$value[trend_data()$year == max(trend_data()$year)]) & trend_data()$year == max(trend_data()$year)], # area with highest value at latest time point
-                     max(trend_data()$value[trend_data()$year == max(trend_data()$year)]), #highest value
-                     trend_data()$spatial.unit[trend_data()$value == min(trend_data()$value[trend_data()$year == max(trend_data()$year)]) & trend_data()$year == max(trend_data()$year)], # area with lowest value at latest time point
-                     min(trend_data()$value[trend_data()$year == max(trend_data()$year)]) #lowest value
-        )
-        )
-      } else {
-        HTML(sprintf("Latest: In the latest data available for all selected areas, the %s for the %s population was highest in %s (%.1f) and lowest in %s (%.1f).", 
-                     tolower(trend_metadata()$measure), # units
-                     tolower(input$sex_trend),#sex
-                     unique(trend_data()$spatial.unit[trend_data()$value == unique(max(trend_data()$value[trend_data()$year == max(trend_data()$year[trend_data()$spatial.unit!="Scotland"])])) 
-                                                      & trend_data()$year == max(trend_data()$year[trend_data()$spatial.unit!="Scotland"])]), # area with highest value at latest shared time point
-                     unique(max(trend_data()$value[trend_data()$year == max(trend_data()[trend_data()$spatial.unit!="Scotland"]$year)])),#, #highest value
-                     unique(trend_data()$spatial.unit[trend_data()$value == unique(min(trend_data()$value[trend_data()$year == max(trend_data()$year[trend_data()$spatial.unit!="Scotland"])])) 
-                                                      & trend_data()$year == max(trend_data()$year[trend_data()$spatial.unit!="Scotland"])]), # area with lowest value at latest shared time point
-                     unique(min(trend_data()$value[trend_data()$year == max(trend_data()[trend_data()$spatial.unit!="Scotland"]$year)]))
-        )
-        )
-      }
-    }
-    
-# display 4 x titles
-tagList(
-  tags$h5(indicator, class = "chart-header"), # selected indicator
-  tags$h6(subtitle), # definition plus units
-  tags$h6(source), # source of the data
-  tags$h6(narrative_trend)
-)
-
+  # display 4 x titles
+  tagList(
+    tags$h5(indicator, class = "chart-header"), # selected indicator
+    tags$h6(subtitle), # definition plus units
+    tags$h6(source), # source of the data
+    tags$h6(narrative)
+  )
+  
 })
 
 
@@ -243,14 +319,14 @@ output$data_trend <- renderUI({
   req(input$mhi_trend)
   
   if (nrow(trend_data()) > 0) {
-
+    
     tagList(
       tags$h5(input$mhi_trend, class = "chart-header"), # selected indicator
       tags$h6("The data plotted in the chart are shown in the table below. Data can be sorted by clicking the column name, and downloaded as a spreadsheet by clicking the button underneath.")
     )
-  
-    }
-  })
+    
+  }
+})
 
 
 # note about the metadata table 
@@ -258,10 +334,10 @@ output$metadata_trend <- renderUI({
   
   req(input$mhi_trend)
   
-    tagList(
-      tags$h5(input$mhi_trend, class = "chart-header"), # selected indicator
-      tags$h6("Important information about the indicator data.")
-    )
+  tagList(
+    tags$h5(input$mhi_trend, class = "chart-header"), # selected indicator
+    tags$h6("Important information about the indicator data.")
+  )
 })
 
 
@@ -274,6 +350,9 @@ output$dnldButton_trend <- renderUI({
 
 
 output$trend_plot <- renderPlot({   # for ggplot
+  
+  req(trend_data())
+  req(trend_metadata())
   
   # Obtain length of all areas to be plotted, if more than 12, then 12,
   # this avoids issues. An error message is displayed if >12 are selected. 
@@ -400,8 +479,8 @@ output$trend_plot <- renderPlot({   # for ggplot
                          minor_breaks = new_years[seq(1, length(new_years), by = 1)],
                          breaks = new_years[seq(1, length(new_years), by = gap)],
                          labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap)]#,
-                       #  guide = "axis_minor"
-                         ) +
+                         #  guide = "axis_minor"
+      ) +
       theme(text = element_text(size=20, family="Arial"),
             axis.title.y = element_text(face = "bold", size = 18, angle = 0, vjust = 0.5),
             axis.title.x = element_text(face = "bold", size = 18),
@@ -412,7 +491,7 @@ output$trend_plot <- renderPlot({   # for ggplot
             legend.justification = c(0, 1),
             legend.position = "top",
             legend.key.size = unit(1, 'cm'),
-          #  legend.location = "plot",
+            #  legend.location = "plot",
             axis.line = element_line(color = 'black'),
             panel.grid.major = element_blank(),
             panel.grid.minor = element_blank(),
@@ -456,6 +535,7 @@ output$trend_plot <- renderPlot({   # for ggplot
 output$trend_hover_info <- renderUI({ # code from https://gitlab.com/-/snippets/16220
   
   req(trend_data())
+  req(input$plot_hover)
   hover <- input$plot_hover
   point <- nearPoints(trend_data(), hover, threshold = 5, maxpoints = 1, addDist = TRUE) # threshold was 50
   if (nrow(point) == 0) return(NULL)
@@ -467,10 +547,10 @@ output$trend_hover_info <- renderUI({ # code from https://gitlab.com/-/snippets/
                   "#C5C3DA", "#ECEBF3")
   
   # get the spatial units selected
-#  selected_spunit <- unique(trend_data()$spatial.unit) %>%
-    # mutate(spatial.unit = factor(spatial.unit,# adjusting levels of spatial.scale, so Scotland always plotted as black
-    #                              levels = c("Scotland", hb_names, la_names, pd_names
-    #                              )))
+  #  selected_spunit <- unique(trend_data()$spatial.unit) %>%
+  # mutate(spatial.unit = factor(spatial.unit,# adjusting levels of spatial.scale, so Scotland always plotted as black
+  #                              levels = c("Scotland", hb_names, la_names, pd_names
+  #                              )))
   selected <- trend_data() %>%
     group_by(spatial.unit) %>%
     summarise() %>%
@@ -509,7 +589,8 @@ output$trend_hover_info <- renderUI({ # code from https://gitlab.com/-/snippets/
 
 
 alt_text <- reactive({
-  
+  req(input$mhi_trend)
+  req(trend_metadata())
   text <- paste0("The x-axis displays years and the y-axis displays the ",
                  trend_metadata()$measure, " of ",
                  input$mhi_trend, 
@@ -525,19 +606,20 @@ alt_text <- reactive({
 
 table_data <- reactive ({
   
+  req(trend_data())
   df <- trend_data() %>%
     dplyr::mutate(value = sprintf(rnd1dp(value), fmt = '%#.1f'),
                   lower_ci = sprintf(rnd1dp(lower_ci), fmt = '%#.1f'),
                   upper_ci = sprintf(rnd1dp(upper_ci), fmt = '%#.1f')) %>% 
     arrange(year_label, spatial.unit) %>%
     select("Area type" = spatial.scale,
-            Area = spatial.unit, 
-            Sex = sex, 
-            "Time period" = year_label,  
-            Value = value, 
-            "Lower 95% CI" = lower_ci,
-            "Upper 95% CI" = upper_ci)
-  })
+           Area = spatial.unit, 
+           Sex = sex, 
+           "Time period" = year_label,  
+           Value = value, 
+           "Lower 95% CI" = lower_ci,
+           "Upper 95% CI" = upper_ci)
+})
 
 ###############################################.
 ## Table ----
@@ -545,19 +627,14 @@ table_data <- reactive ({
 
 #display table based on selection made by user 
 output$trend_table <- DT::renderDataTable({
+  
+  req(table_data())
   if (nrow(table_data()) > 0) {
     DT::datatable(table_data(),
                   rownames = FALSE,
                   options = list(dom = 'ltip', # puts page length menu before the table, and the info and pagination sections after
                                  pageLength = 15, 
                                  lengthMenu = list(c(5, 15, -1), c("5", "15", "All")), 
-                                 # columnDefs = list(list(className = 'dt-right', targets = 3:5), # right align the numeric columns
-                                 #                   list(targets=c(0), visible=TRUE, width='300'),
-                                 #                   list(targets=c(1), visible=TRUE, width='90'),
-                                 #                   list(targets=c(2), visible=TRUE, width='90'),
-                                 #                   list(targets=c(3), visible=TRUE, width='90'),
-                                 #                   list(targets=c(4), visible=TRUE, width='90'),
-                                 #                   list(targets=c(5), visible=TRUE, width='90')), # attempt to even out column widths. worked a bit. 
                                  autoWidth = TRUE,
                                  initComplete = JS(
                                    "function(settings, json) {",
@@ -573,12 +650,14 @@ output$trend_table <- DT::renderDataTable({
 
 #display metadata table
 output$trend_metatable <- DT::renderDataTable({
+  
+  req(trend_metadata())
   if (nrow(trend_metadata()) > 0) {
-
+    
     df <- trend_metadata() %>%
       select("Indicator name" = ind_name,
              "Indicator definition" = long_definition,
-           #  Source = source_url,
+             #  Source = source_url,
              Source = source,
              Numerator = numerator,
              Denominator = denominator,
@@ -593,78 +672,23 @@ output$trend_metatable <- DT::renderDataTable({
       pivot_longer(-"Indicator name", names_to = "char", values_to = "info") %>%
       select(-"Indicator name") %>%
       mutate(info = gsub("<b>Source: </b>", "", info))
-
+    
     DT::datatable(df,
                   rownames = FALSE,
                   colnames = rep("", ncol(df)),
                   options = list(dom = 't', # table only
                                  pageLength = 13,
                                  autoWidth = TRUE,
-                               #  html = TRUE,
+                                 #  html = TRUE,
                                  fill = TRUE,
                                  ordering = F,
                                  fillContainer = TRUE)
-                  ) %>%
+    ) %>%
       formatStyle('char', fontWeight = 'bold')
-      }
+  }
 } , escape = FALSE)
 
 
-# output$trend_metatable <- renderReactable({
-#   
-#   if (nrow(trend_metadata()) > 0) {
-#     
-#     df <- trend_metadata() %>%
-#       select("Indicator name" = ind_name, 
-#              "Indicator definition" = long_definition, 
-#              Source = source_url, 
-#              Numerator = numerator, 
-#              Denominator = denominator, 
-#              Measure = measure, 
-#              Weighting = weighted, 
-#              "Confidence intervals" = conf_intervals, 
-#              "Disclosure control" = suppression, 
-#              Sex = sexes, 
-#              "Time period" = years, 
-#              Geographies = geogs, 
-#              SIMD = simd) %>%
-#       pivot_longer(-"Indicator name", names_to = "char", values_to = "info") %>%
-#       select(-"Indicator name") %>%
-#       mutate(info = gsub("<b>Source: </b>", "", info))
-#     
-#   
-#     js_style <- JS("
-#     function(rowInfo) {
-#       return {fontWeight: 'bold' }
-#     }
-#   ")
-#     
-#   reactable(
-#     df, 
-#     defaultPageSize = 25, # set max number of rows per page
-#   #  theme = table_theme(), # table_theme() can be found in table functions
-#     rowStyle = list(cursor = "pointer"),
-#     highlight = TRUE, # changes row colour when user hovers over it
-#     # Customising all the columns in the table:
-#     columns = list(
-#       # Column 1: Indicator name 
-#       char = colDef(
-#         #minWidth = 350,
-#         show = TRUE, 
-#         html = TRUE, 
-#         name = "",
-#         #style = list(fontWeight=600)
-#         style = js_style),
-#       info = colDef(
-#         #minWidth = 350,
-#         show = TRUE, 
-#         html = TRUE, 
-#         name = ""))
-#     )
-#   }
-# })
-# 
-#                      
 
 #####################################.    
 #### Excel download of data extract table ----

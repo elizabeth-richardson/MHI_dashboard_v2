@@ -58,7 +58,7 @@ observeEvent(input$intabset, {
 # source(file.path("tabs_server/national_server.R"), local = TRUE)$value
 # source(file.path("tabs_server/local_server.R"), local = TRUE)$value
  source(file.path("tabs_server/trend_server.R"), local = TRUE)$value
-# source(file.path("tabs_server/inequalities_server.R"), local = TRUE)$value
+ source(file.path("tabs_server/inequalities_server.R"), local = TRUE)$value
  source(file.path("tabs_server/sex_server.R"), local = TRUE)$value
 # source(file.path("tabs_server/data_server.R"), local = TRUE)$value
 

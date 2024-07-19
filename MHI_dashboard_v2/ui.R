@@ -5,12 +5,9 @@
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # # Sourcing the UI scripts
-#walk(list.files("tabs", full.names = TRUE), ~ source(.x))
-# source(file.path("tabs/trend_tab.R"), local = TRUE)$value
-# 
 source(file.path("tabs/trend_tab.R"), local = TRUE)$value
-#source(file.path("tabs/inequalities_server.R"), local = TRUE)$value
-#source(file.path("tabs/sex_tab.R"), local = TRUE)$value
+source(file.path("tabs/inequalities_tab.R"), local = TRUE)$value
+source(file.path("tabs/sex_tab.R"), local = TRUE)$value
 
 
 link_phs <- tags$a(
@@ -21,29 +18,25 @@ link_phs <- tags$a(
 
 
 page_navbar(
-  
- # title = "Adult MHI dashboard",
-  title = link_phs, # PHS logo links to PHS website   # style = "position: relative; top: -5px;"
-  tags$head(HTML("<html lang='en'>")), # Set the language of the page - important for accessibility
   fillable = FALSE, # controlling how items grow/shrink when browser different sizes
   window_title = "Adult mental health profile",
+  id = "nav",
   collapsible = TRUE, # collapse tabs on smaller screens
-  fillable_mobile = TRUE,
   lang = "en",
   bg = phs_colours(colourname = "phs-purple"), # background navbar colour
   theme = phs_theme, # dashboard theme - defined in global script
-  header = tags$head(includeCSS("www/styles.css"),  # CSS stylesheet
-                     tags$link(rel = "shortcut icon", href = "www/favicon_phs.ico") # Icon for browser tab
-  ),
-  # tags$head(
-  #   # #required for saving leaflet map as png (see this for more info: https://stackoverflow.com/questions/47343316/shiny-leaflet-easyprint-plugin)
-  #   # tags$script(src = "https://rawgit.com/rowanwins/leaflet-easyPrint/gh-pages/dist/bundle.js"),
-  #   # # required for homepage styling
-  #   includeCSS("www/styles.css")), # required to specify formatting (particularly of landing page)
-  # 
-  
+  # place external scripts in footer argument to avoid warnings as recommended by package developers
+  footer = tags$head(
+   # tags$script(src = "https://rawgit.com/rowanwins/leaflet-easyPrint/gh-pages/dist/bundle.js"),# required for saving leaflet map as png (see this for more info: https://stackoverflow.com/questions/47343316/shiny-leaflet-easyprint-plugin)
+    includeCSS("www/styles.css") # required to specify formatting (particularly of landing page)
+  ), 
   useShinyjs(), # need to declare this to enable geography filter to call on functions within shinyjs package
-  
+  title = link_phs, # PHS logo links to PHS website   # style = "position: relative; top: -5px;"
+  tags$head(HTML("<html lang='en'>")), # Set the language of the page - important for accessibility
+  fillable_mobile = TRUE,
+  header = tags$head(includeCSS("www/styles.css"),  # CSS stylesheet
+                     tags$link(rel = "shortcut icon", href = "www/favicon_phs.ico")), # Icon for browser tab
+
   # custom js function to close the nav menu in the nav bar 1000 millisecs after any navigation buttons are clicked
   shinyjs::extendShinyjs(text = " shinyjs.closeNavMenu = function() {
         setTimeout(function() {$('.dropdown-menu').removeClass('show');}, 1000);}", functions = c("closeNavMenu")),
@@ -62,7 +55,7 @@ page_navbar(
   #                            ), 
   #                          # global_geography_filters_ui(id = "geo_filters", areatype_choices = areatype_list, parent_area_choices = hscp_list)
   #                         )),
-  
+
     # home tab -------------------------------------------------------------------
   nav_panel(HTML("<b><big>Home (ScotPHO)</big></b>"),
             value = "home"
@@ -74,18 +67,18 @@ page_navbar(
     # Health and wellbeing
     nav_panel(value = "adults",
               title = "Adults",
-              navset_tab(
+              navset_tab(id = "adult_tabs",
                 nav_panel(title = "National profile"#, summary_table_ui("hwb_summary")
                 ),
                 nav_panel(title = "Local profile"#, summary_table_ui("hwb_summary")
                 ),
-                nav_panel(title = "Deprivation", inequalities_tab()
+                nav_panel(title = "Deprivation", inequalities_tab, value = "deprivation_tab"
                 ),
-                nav_panel(title = "Area", trend_tab()
+                nav_panel(title = "Area", trend_tab, value = "area_tab"
                 ),
                 nav_panel(title = "Rank"#, plotOutput("body_mass")
                 ),  
-                nav_panel(title = "Sex", sex_tab()
+                nav_panel(title = "Sex", sex_tab, value = "sex_tab"
                 )
                 
               )),
@@ -95,6 +88,7 @@ page_navbar(
     nav_panel(value = "CYP",
               title = "Children and young people",
               navset_tab(
+                id = "cyp_tabs",
                 nav_panel(title = "This profile is currently in development.")
                 )
               )
@@ -108,18 +102,22 @@ page_navbar(
   ),
   
   # source code link -------------------------------------------------------------------
-  nav_item(tags$a(icon("github"), "SourceCode", href = "https://github.com/Public-Health-Scotland/scotpho-profiles-tool/tree/master/shiny_app", target = "_blank")),
+  nav_item(tags$a(icon("github"), "SourceCode", 
+                  href = "https://github.com/Public-Health-Scotland/scotpho-profiles-tool/tree/master/shiny_app", 
+                  target = "_blank")),
   
   # other tabs -----------------------------------------------------------------
   nav_menu(
     title = "More information",
     
     # about scotpho tab
-    nav_panel(title = "About ScotPHO"#, about_scotpho_text
+    nav_panel(title = "About ScotPHO",
+              value = "about_scotpho" #, about_scotpho_text
     ),
     
     # about profiles tab (to do: replace placeholder text)
-    nav_panel(title = "About Profiles"#,
+    nav_panel(title = "About Profiles",
+              value = "about_profiles" #,
               # accordion(
               #   open= FALSE, #no accordion panels open on loading
               #   multiple = TRUE, #allows multiple profile accordion panels to be open at once
@@ -136,7 +134,8 @@ page_navbar(
     ),
     
     # indicator definitions tab
-    nav_panel(title = "Indicator Definitions"#,
+    nav_panel(title = "Indicator Definitions",
+              value = "definitions" #,
               #  definitions_tab_UI("metadata")
     ))
 )

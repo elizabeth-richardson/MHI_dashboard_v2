@@ -23,39 +23,43 @@
 # enable/ disable filters and update the filter labels,
 # depending on what indicator was selected
 observeEvent(input$mhi_inequals, { #actions to take only once mhi_trend has changed
-  #observe( {
-  
+
   shinyjs::useShinyjs()
-
-  available_sex <- (all_data %>%
-                      subset(ind_name == input$mhi_inequals) %>%
-                      summarise(sex = unique(sex)))[["sex"]]
-
-  available_ci <- all_data %>%
-    subset(ind_name == input$mhi_inequals) %>%
+  
+  available_sex2 <- (all_data %>%
+                       subset(ind_name == input$mhi_inequals & spatial.scale == "SIMD") %>%
+                       summarise(sex = unique(sex)))[["sex"]]
+  
+  available_ci2 <- all_data %>%
+    subset(ind_name == input$mhi_inequals & spatial.scale == "SIMD") %>%
     select(lower_ci)
-
-
-
+  
+  
+  
   # If female and male data are available, enable sex_inequals filter, otherwise disable it
-  if("Female" %in% available_sex) {
+  if("Female" %in% available_sex2) {
     shinyjs::enable("sex_inequals")
-    updateSelectInput(session, "sex_inequals", selected = "Total")
+    updateSelectInput(session, "sex_inequals", 
+                      choices = c(
+                        "Total (Males and Females)" = "Total", "Females" = "Female", "Males" = "Male"),
+                      selected = "Total")
   } else {
-    updateSelectInput(session, "sex_inequals", choices = c("Total (Males and Females)" = "Total"), selected = "Total")
     shinyjs::disable("sex_inequals")
+    updateSelectInput(session, "sex_inequals", 
+                      choices = c("Total (Males and Females)" = "Total"), 
+                      selected = "Total")
   }
-
-
+  
+  
   # Disabling and unchecking CI option if no CIs available
-  if (all(is.na(available_ci$lower_ci)) == TRUE) {
-    checkboxInput(session, "ci_inequals", value = FALSE)
+  if (all(is.na(available_ci2$lower_ci)) == TRUE) {
+    #   checkboxInput(session, "ci_inequals", value = FALSE)
     shinyjs::disable("ci_inequals")
   } else {
     shinyjs::enable("ci_inequals")
   }
-
-} #, ignoreInit = TRUE 
+  
+} 
 )
 
 
@@ -71,8 +75,7 @@ observeEvent(input$mhi_inequals, { #actions to take only once mhi_trend has chan
 inequals_trenddata <- reactive({
   
   req(input$mhi_inequals)
-  req(input$sex_inequals)
-  
+
   df <- all_data %>%
     subset(ind_name == input$mhi_inequals & 
              sex == input$sex_inequals) %>% 
@@ -96,8 +99,7 @@ inequals_trenddata <- reactive({
 inequals_summarydata <- reactive({
   
   req(input$mhi_inequals)
-  req(input$sex_inequals)
-  
+
   df <- ineq_data %>%
     subset(ind_name == input$mhi_inequals & 
              sex == input$sex_inequals) %>% 
@@ -111,7 +113,7 @@ inequals_summarydata <- reactive({
 inequals_metadata <- reactive({
   
   req(input$mhi_inequals)
-
+  
   df <- db_metadata %>%
     subset(ind_name == input$mhi_inequals) %>% 
     select(ind_name, domain,construct,short_definition,long_definition,source,measure,numerator,denominator,
@@ -128,31 +130,21 @@ inequals_metadata <- reactive({
 
 output$title_inequals <- renderUI({
   
-  req(input$mhi_inequals)
-  req(input$sex_inequals)
-  req(inequals_trenddata())
-  
-  # create dynamic text if no indicators available for selected profile
-  # and geography
-  shiny::validate(
-    need( nrow(inequals_trenddata()) > 0, "No data available for this indicator currently. Please select another.")
-  )
-  
   indicator <- paste0(input$mhi_inequals, 
                       ifelse(input$sex_inequals=="Total", " (total population)",
                              ifelse(input$sex_inequals=="Male", " (males)", " (females)")))
-
+  
   subtitle <- HTML(paste0("<b>Definition:</b> ", unique(inequals_metadata()$short_definition)))
   
   source <- HTML(inequals_metadata()$source_url)
-
   
- # display 3 x titles
+  
+  # display 3 x titles
   tagList(
     tags$h5(indicator, class = "chart-header"), # selected indicator
     tags$h6(subtitle), # definition plus units
     tags$h6(source) # source of the data
-      )
+  )
 })
 
 
@@ -169,107 +161,90 @@ output$title_inequals <- renderUI({
 
 output$plot1_title <- renderUI({
   
-  req(input$mhi_inequals)
-  req(input$sex_inequals)
-  req(inequals_trenddata())
-  
-  # create dynamic text if no indicators available for selected profile
-  # and geography
-  shiny::validate(
-    need( nrow(inequals_trenddata()) > 0, "No data available for this indicator currently. Please select another.")
-  )
-  
-  if (nrow(inequals_trenddata()) > 0) {
-    narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the %s was %.1f in the 20%% most deprived areas and %.1f in the 20%% least deprived areas (%s population).", 
-                              unique(inequals_trenddata()$year_label[inequals_trenddata()$year == max(inequals_trenddata()$year)]), # year-label corresponding to latest year
-                              tolower(unique(inequals_metadata()$measure)), # units
-                              inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "1st (Most deprived)"], # most dep value
-                              inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "5th (Least deprived)"], # least dep value
-                              tolower(input$sex_inequals) # sex
+  narrative_inequals <- if (nrow(inequals_trenddata()) > 0) {
+    HTML(sprintf("<b>Latest data:</b> In %s, the %s was %.1f in the 20%% most deprived areas and %.1f in the 20%% least deprived areas (%s population).",
+                 unique(inequals_trenddata()$year_label[inequals_trenddata()$year == max(inequals_trenddata()$year)]), # year-label corresponding to latest year
+                 tolower(unique(inequals_metadata()$measure)), # units
+                 inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "1st (Most deprived)"], # most dep value
+                 inequals_trenddata()$value[inequals_trenddata()$year == max(inequals_trenddata()$year) & inequals_trenddata()$spatial.unit == "5th (Least deprived)"], # least dep value
+                 tolower(input$sex_inequals) # sex
     ))
-  } else { narrative <- "" } 
+  } else { "" }
   
   tagList(
-        tags$h5("Change over time by deprivation group"),
-        tags$h6(narrative)
-    )
-  })
+    tags$h5("Change over time by deprivation group"),
+    tags$h6(narrative_inequals)
+  )
+})
 
 output$plot2_title <- renderUI({
   
-  req(input$mhi_inequals)
-  req(input$sex_inequals)
   req(inequals_summarydata())
   
-  # create dynamic text if no indicators available for selected profile
-  # and geography
-  shiny::validate(
-    need( nrow(inequals_summarydata()) > 0, "No data available for this indicator currently. Please select another.")
-  )
-  
-  if (min(inequals_summarydata()$sii)>=0) {
-
-        narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value %.1f higher than the least deprived area (Slope Index of Inequality (SII)).</p>
+  narrative_sii <- if (inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]>0) { # narrative for positive SII
+    
+    HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value %.1f higher than the least deprived area (Slope Index of Inequality (SII)).</p>
                  <p><b>Interpretation:</b> A trend away from zero means that the absolute gap between the most and least deprived areas is growing.</p>",
-                     unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
-                     inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop SII value
-        )
-      } else if (min(inequals_summarydata()$sii)>0) {
-
-        narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value %.1f lower than the least deprived area (Slope Index of Inequality (SII)).</p>
+                 unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
+                 inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop SII value
+    )
+  } else if (inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]<0) { # narrative for negative SII
+    
+    HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value %.1f lower than the least deprived area (Slope Index of Inequality (SII)).</p>
                     <p><b>Interpretation:</b> A trend away from zero means that the absolute gap between the most and least deprived areas is growing.</p>",
-                     unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
-                     -1*inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop SII value
-        )
-      } else { narrative <- "" } 
-
+                 unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
+                 -1*inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop SII value
+    )
+  } else if (inequals_summarydata()$sii[inequals_summarydata()$year == max(inequals_summarydata()$year)]==0) { 
+    
+    HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value the same as the least deprived area (Slope Index of Inequality (SII)).</p>
+                    <p><b>Interpretation:</b> A trend away from zero means that the absolute gap between the most and least deprived areas is growing.</p>",
+                 unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # year-label corresponding to latest year
+    ) 
+    )
+  } else { "" }
+  
   tagList(
     tags$h5("Absolute inequality over time"),
-    tags$h6(narrative)
+    tags$h6(narrative_sii)
   )
 })
 
 output$plot3_title <- renderUI({
   
-  req(input$mhi_inequals)
-  req(input$sex_inequals)
   req(inequals_summarydata())
   
-  # create dynamic text if no indicators available for selected profile
-  # and geography
-  shiny::validate(
-    need( nrow(inequals_summarydata()) > 0, "No data available for this indicator currently. Please select another.")
-  )
+  narrative_rii <- if (nrow(inequals_summarydata()) > 0) {
+    
+    if (inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)] >0 ) {
+      HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value that was %.1f%% above the population average value (calculated from the Relative Index of Inequality (RII)).</p>
+                     <p><b>Interpretation:</b> A trend away from zero means that the relative gap between the most deprived area and the population average is growing.</p>",
+                   unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
+                   inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop RII value
+      )
+    } else if (inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)] <0 ) {
+      HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value that was %.1f%% below the population average value (calculated from the Relative Index of Inequality (RII)).</p>
+                     <p><b>Interpretation:</b> A trend away from zero means that the relative gap between the most deprived area and the population average is growing.</p>",
+                   unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
+                   -1*inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop RII value, multiplied by -1
+      )
+    } else if (inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)] ==0 ) {
+      HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value that was the same as the population average value (calculated from the Relative Index of Inequality (RII)).</p>
+                     <p><b>Interpretation:</b> A trend away from zero means that the relative gap between the most deprived area and the population average is growing.</p>",
+                   unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # year-label corresponding to latest year
+      ) 
+      )
+      
+    } else { "" } 
+  } 
   
-    if (nrow(inequals_summarydata()) > 0) {
-
-      if (inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)] >0 ) {
-        narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value that was %.1f%% above the population average value (calculated from the Relative Index of Inequality (RII)).</p>
-                     <p><b>Interpretation:</b> A trend away from zero means that the relative gap between the most deprived area and the population average is growing.</p>",
-                     unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
-                     inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop RII value
-        )
-      } else if (inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)] <0 ) {
-        narrative <- HTML(sprintf("<b>Latest data:</b> In %s, the most deprived area had a value that was %.1f%% below the population average value (calculated from the Relative Index of Inequality (RII)).</p>
-                     <p><b>Interpretation:</b> A trend away from zero means that the relative gap between the most deprived area and the population average is growing.</p>",
-                     unique(inequals_summarydata()$year_label[inequals_summarydata()$year == max(inequals_summarydata()$year)]), # year-label corresponding to latest year
-                     -1*inequals_summarydata()$rii_int[inequals_summarydata()$year == max(inequals_summarydata()$year)]) # latest whole pop RII value, multiplied by -1
-        )
-      } else { narrative <- "" } 
-    } else { narrative <- "" }
-
   
   tagList(
     tags$h5("Relative inequality over time"),
-    tags$h6(narrative)
+    tags$h6(narrative_rii)
   )
 })
 
-# # note about data download (reactive on whether there is data to plot)
-# output$dnldnote_ineq <- renderText(
-#   if (nrow(inequals_trenddata()) > 0) {
-#     "The data plotted in the charts are shown in the table below. Data can be sorted by clicking the diamond next to the column name, and downloaded as a spreadsheet by clicking the 'Download data' button."
-#   })
 
 # download button under plot (reactive on whether there is data to plot)
 output$dnldButton_ineq <- renderUI({
@@ -287,14 +262,14 @@ output$data_inequals <- renderUI({
   req(input$sex_inequals)
   
   if (nrow(inequals_trenddata()) > 0) {
-
+    
     tagList(
       tags$h5(input$mhi_inequals, class = "chart-header"), # selected indicator
       tags$h6("The data plotted in the chart are shown in the table below. Data can be sorted by clicking the column name, and downloaded as a spreadsheet by clicking the button underneath.")
     )
-  
-    }
-  })
+    
+  }
+})
 
 
 # note about the metadata table 
@@ -302,22 +277,11 @@ output$metadata_inequals <- renderUI({
   
   req(input$mhi_inequals)
   
-    tagList(
-      tags$h5(input$mhi_inequals, class = "chart-header"), # selected indicator
-      tags$h6("Important information about the indicator data.")
-    )
+  tagList(
+    tags$h5(input$mhi_inequals, class = "chart-header"), # selected indicator
+    tags$h6("Important information about the data for this indicator.")
+  )
 })
-
-
-# download button under plot (reactive on whether there is data to plot)
-output$dnldButton_ineq <- renderUI({
-  if (nrow(inequals_trenddata()) > 0) {
-    downloadButton("trend_dnld", "Download data (.xlsx format)")
-  }
-})
-
-
-
 
 
 # Inequalities trend plot ----
@@ -398,24 +362,23 @@ output$simd_trend_plot <- renderPlot({
                          labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap)]) +
       #      guides(colour = guide_legend(title = "Deprivation group"), # this didn't work
       #             linetype = guide_legend(title = "Deprivation group")) +
-      theme(text = element_text(size=20#, family="Arial"
-                                ),
-            axis.title.y = element_text(face = "bold", size = 18, angle = 0, vjust = 0.9),
-            axis.title.x = element_text(face = "bold", size = 18),
+      theme(text = element_text(size=18),
+            axis.title.y = element_text(size = 18, angle = 0, vjust = 0.9),
+            axis.title.x = element_text(size = 18),
             axis.text.x = element_text(size = 18, colour = 'black'),
             axis.text.y = element_text(size = 18, colour = 'black'),
             axis.ticks.x = element_line(),
             legend.text = element_text(size = 16),
             legend.position = "inside",
-            legend.position.inside = c(-0.05, 0.2),
+            legend.position.inside = c(-0.03, 0.2), # was-0.05
             legend.justification="right",
-          #  legend.location = "plot",
+            #  legend.location = "plot",
             legend.key.size = unit(1, 'cm'),
             axis.line = element_line(color = 'black'),
             panel.grid.major = element_blank(),
             panel.grid.minor = element_blank(),
             panel.grid.major.x = element_blank(),
-            plot.margin = unit(c(0,0,0,8), "lines")) +
+            plot.margin = unit(c(0,0,0,10), "lines")) + # was 8
       labs(alt = alt_text_ineqs(),
            y = yaxis_title,
            colour = "Deprivation group", # this didn't work
@@ -560,10 +523,9 @@ output$simd_sii_plot <- renderPlot({
       geom_point(size=3, colour = "#C73918") +
       geom_hline(yintercept=0) +
       theme_phs() +
-      theme(text = element_text(size=18#, family="Arial"
-                                ),
-            axis.title.y = element_text(face = "bold", size = 18, angle = 0, vjust = 0.5),
-            axis.title.x = element_text(face = "bold", size = 18),
+      theme(text = element_text(size=18),
+            axis.title.y = element_text(size = 18, angle = 0, vjust = 0.5),
+            axis.title.x = element_text(size = 18),
             axis.text.x = element_text(size = 18, colour = 'black'),
             axis.text.y = element_text(size = 18, colour = 'black'),
             axis.ticks.x = element_line(),
@@ -720,10 +682,9 @@ output$simd_rii_plot <- renderPlot({
       geom_point(size=3, colour = "#948DA3") +
       geom_hline(yintercept=0) +
       theme_phs() +
-      theme(text = element_text(size=18#, family="Arial"
-                                ),
-            axis.title.y = element_text(face = "bold", size = 18, angle = 0, vjust = 0.5),
-            axis.title.x = element_text(face = "bold", size = 18),
+      theme(text = element_text(size=18),
+            axis.title.y = element_text(size = 18, angle = 0, vjust = 0.5),
+            axis.title.x = element_text(size = 18),
             axis.text.x = element_text(size = 18, colour = 'black'),
             axis.text.y = element_text(size = 18, colour = 'black'),
             axis.ticks.x = element_line(),
@@ -822,6 +783,70 @@ alt_text_rii <- reactive({
 })
 
 
+###############################################.        
+#### Help modals ----
+###############################################.  
+
+## Help on SII
+observeEvent(input$help_sii, {
+  showModal(modalDialog(
+    title = "Absolute inequality",
+    p("The chart shows how absolute inequality has changed over time."),
+    p(tags$b("Interpretation:")),
+    p("Absolute inequality is measured using the ", tags$b("'Slope Index of Inequality (SII)'"), ".",
+      "The bigger the SII (whether more positive or more negative) the greater the gap between the most and least deprived areas. If there was no inequality the SII would be zero. 
+      It is possible for absolute inequalities to change in the opposite direction to relative inequalities: it is therefore important to consider trends in both. Both are presented here."),
+    p(tags$b("Calculation:")),
+    p("Information on how the SII is calculated is available on the",
+      tags$a(href="https://www.scotpho.org.uk/methods-and-data/measuring-health-inequalities/","Measuring inequalities section",  class="externallink"),"of the ScotPHO website. 
+      Our SII calculation involved dividing the population of Scotland into five groups (quintiles) based on their ",
+      tags$a(href="https://www2.gov.scot/simd",  "Scottish Index of Multiple Deprivation (SIMD)",
+             class="externallink"),
+      " deprivation level. Our calculation used a linear regression model."),
+    size = "l", easyClose = TRUE, fade=FALSE, footer = modalButton("Close (Esc)")
+  ))
+}) 
+
+## Help on RII
+observeEvent(input$help_rii, {
+  showModal(modalDialog(
+    title = "Relative inequality",
+    p("The chart shows how relative inequality has changed over time."),
+    p(tags$b("Interpretation:")),
+    p("Relative inequality is measured using the ", tags$b("'Relative Index of Inequality (RII)'"), ".", 
+      "We have converted the RII so that the value in the chart shows the percentage difference between the most deprived area and the population average. 
+      Larger values (whether more positive or more negative) show greater relative inequality. If there was no relative inequality the value would be zero. 
+      It is possible for absolute inequalities to change in the opposite direction to relative inequalities: it is therefore important to consider trends in both. 
+      Both are presented here."),
+    p(tags$b("Calculation:")),
+    p("Information on how the RII is calculated is available on the",
+      tags$a(href="https://www.scotpho.org.uk/methods-and-data/measuring-health-inequalities/","Measuring inequalities section",  class="externallink"),"of the ScotPHO website. 
+      We calculated the RII by dividing the Slope Index of Inequality (SII, presented on the ", tags$b("Absolute inequality"), " chart) by the Scottish average for the indicator. 
+      The SII calculation used a linear regression model on indicator data for ",
+      tags$a(href="https://www2.gov.scot/simd",  "Scottish Index of Multiple Deprivation (SIMD)",
+             class="externallink"),
+      " deprivation quintiles."),
+    size = "l", easyClose = TRUE, fade=FALSE, footer = modalButton("Close (Esc)")
+  )
+  )
+}) 
+
+output$help_sii_button <- renderUI({
+  if(nrow(inequals_trenddata()) > 0){
+    actionButton("help_sii", label="What does this chart show?",
+                 icon= icon('question-circle'), class ="down")
+  } 
+})
+
+output$help_rii_button <- renderUI({
+  if(nrow(inequals_trenddata()) > 0){
+    actionButton("help_rii", label="What does this chart show?",
+                 icon= icon('question-circle'), class ="down")
+  } 
+})
+
+
+
 
 ###############################################.
 ## Reactive data for table ----
@@ -876,11 +901,11 @@ output$inequals_table <- DT::renderDataTable({
 #display metadata table
 output$inequals_metatable <- DT::renderDataTable({
   if (nrow(inequals_metadata()) > 0) {
-
+    
     df <- inequals_metadata() %>%
       select("Indicator name" = ind_name,
              "Indicator definition" = long_definition,
-           #  Source = source_url,
+             #  Source = source_url,
              Source = source,
              Numerator = numerator,
              Denominator = denominator,
@@ -895,20 +920,20 @@ output$inequals_metatable <- DT::renderDataTable({
       pivot_longer(-"Indicator name", names_to = "char", values_to = "info") %>%
       select(-"Indicator name") %>%
       mutate(info = gsub("<b>Source: </b>", "", info))
-
+    
     DT::datatable(df,
                   rownames = FALSE,
                   colnames = rep("", ncol(df)),
                   options = list(dom = 't', # table only
                                  pageLength = 13,
                                  autoWidth = TRUE,
-                               #  html = TRUE,
+                                 #  html = TRUE,
                                  fill = TRUE,
                                  ordering = F,
                                  fillContainer = TRUE)
-                  ) %>%
+    ) %>%
       formatStyle('char', fontWeight = 'bold')
-      }
+  }
 } , escape = FALSE)
 
 
@@ -917,8 +942,8 @@ output$inequals_metatable <- DT::renderDataTable({
 ####################################.
 
 output$inequals_dnld <- downloadHandler(
-  mydate <- Sys.Date(),
-  filename = paste("Adult_MHI_inequals_data_", mydate, ".xlsx", sep = ""),
+
+  filename = paste("Adult_MHI_inequals_data_", Sys.Date(), ".xlsx", sep = ""),
   
   content = function(file) {
     

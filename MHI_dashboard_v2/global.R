@@ -9,34 +9,30 @@
 ## Packages ----
 ###############################################.
 
-library(ggplot2)
 #library(scales)
 library(shiny) # for shiny functions
 #library(shinyWidgets) # for checkboxes, etc
 library(shinycssloaders) # for loading icons
+library(shinymanager) # for deploying the app
+library(shinyjs) # for various functions to expand/collapse geography filters 
+library(jsonlite)
 library(htmlwidgets) # for using JS
+library(htmltools) # for using html tags
 library(bslib) # app layout functions/theming
 library(phsstyles) # for phs colour palette
-library(shinyjs) # for various functions to expand/collapse geography filters 
 library(tidyverse)
+library(ggplot2)
 library(arrow)
 library(data.table)
 library(DT) #formatting datatables
 library(openxlsx) # writing xlsx spreadsheets
 library(lubridate)
-library(jsonlite)
-library(htmltools) # for using html tags
 library(reactablefmtr)
 library(reactable) # interactive tables
-
-
-# Get functions
-source(file.path("functions.R"), local = TRUE)$value
-
-# Sourcing ui scripts -------------------------------------------
-list.files("tabs", full.names = TRUE, recursive = TRUE) |>
-   map(~ source(.))
-
+library(dataui) #The `dataui` package is required to use `react_sparkline()`
+library(kableExtra) # tables for pdf downloads
+library(rmarkdown) # for pdf downloads
+library(knitr) # for pdf downloads
 
 # Set dashboard theme ---------------------------------------------------------------
 
@@ -63,11 +59,12 @@ phs_theme <- bs_theme(version = 5, # bootstrap version 5
       ".methodology-table td{ border:thin solid black; padding:3px;}", # for indicator def tab - make nested table cells have black border
       ".shiny-output-error {color: white;}", # hiding auto-generated error messages
       ".shiny-output-error-validation {color: #8e8f90;}", # showing custom error messages
-      ".info-box-header { background-color: #9B4393; color: #fff; font-size: 1.2em !important; }" # info box header lighter phs purple colour with white text
-      
+      # my addition:
+      ".btn {color:#fff; background-color:#007bc2; border:none;}" # turn download and help buttons blue, same as card pill tabs
+
     )
   )
-
+  
 # phs colours for charts with dynamic number of lines/bars
 phs_palette <- unname(unlist(phs_colours()))
 
@@ -126,11 +123,9 @@ last_update <- as.character(db_metadata %>%
 hb_names <- as.character(sort(unique(all_data$spatial.unit[all_data$spatial.scale=="HB"]))) 
 la_names <- as.character(sort(unique(all_data$spatial.unit[all_data$spatial.scale=="LA"]))) 
 pd_names <- as.character(sort(unique(all_data$spatial.unit[all_data$spatial.scale=="PD"]))) 
-#pr_names <- as.character(sort(unique(all_data$spatial.unit[all_data$spatial.scale=="Police Region"]))) 
 
 # Indicator names
 outcome_names <- sort(unique(db_metadata$ind_name[db_metadata$domain=="Mental health outcomes" & !is.na(db_metadata$ind_name)]))
-#outcome_names_wrap <- str_replace_all(str_wrap(outcome_names, width = 32), "\\n", "<br>")
 indiv_names <- sort(unique(db_metadata$ind_name[db_metadata$domain=="Individual determinants" & !is.na(db_metadata$ind_name)]))
 comm_names <- sort(unique(db_metadata$ind_name[db_metadata$domain=="Community determinants" & !is.na(db_metadata$ind_name)]))
 struc_names <- sort(unique(db_metadata$ind_name[db_metadata$domain=="Structural determinants" & !is.na(db_metadata$ind_name)]))
@@ -154,30 +149,30 @@ struc_inds_simd <- sort(db_metadata$ind_name[db_metadata$domain == "Structural d
 
 
 # Filters
-mhi_trend <- selectInput("mhi_trend", 
+mhi_trend <- selectInput("mhi_trend",
                          label = "Select an indicator:",
                          choices = c(list(`Mental health outcomes:` = sort(outcome_names),
                                           `Individual determinants:` = sort(indiv_names),
                                           `Community determinants:` = sort(comm_names),
-                                          `Structural determinants:` = sort(struc_names))), 
+                                          `Structural determinants:` = sort(struc_names))),
                          multiple = FALSE)
 
 scotname_trend <- checkboxInput("scotname_trend", label = "Scotland", value = TRUE)
 
-hbname_trend <- selectInput("hbname_trend", 
-                            label = "Select Health Board(s):", 
+hbname_trend <- selectInput("hbname_trend",
+                            label = "Select Health Board(s):",
                             choices = c(
                               paste(hb_names), ""),
                             multiple=TRUE, selected = "")
 
-caname_trend <- selectInput("caname_trend", 
-                            label = "Select Council Area(s):", 
+caname_trend <- selectInput("caname_trend",
+                            label = "Select Council Area(s):",
                             choices =  c(
                               paste(la_names), ""),
                             multiple=TRUE, selected = "")
 
-pdname_trend <- selectInput("pdname_trend", 
-                            label = "Select Police Division(s):", 
+pdname_trend <- selectInput("pdname_trend",
+                            label = "Select Police Division(s):",
                             choices =  c(
                               paste(pd_names), ""),
                             multiple=TRUE, selected = "")
@@ -195,21 +190,21 @@ ci_trend <- checkboxInput("ci_trend", label = "95% confidence intervals", value 
 zero_trend <- checkboxInput("zero_trend", label = "y-axis should include zero", value = TRUE)
 
 # Filters
-mhi_inequals_sex <- selectInput("mhi_inequals_sex", 
+mhi_inequals_sex <- selectInput("mhi_inequals_sex",
                                 label = "Select an indicator:",
                                 choices = c(list(`Mental health outcomes:` = sort(mhout_inds_sex),
                                                  `Individual determinants:` = sort(indiv_inds_sex),
                                                  `Community determinants:` = sort(comm_inds_sex),
-                                                 `Structural determinants:` = sort(struc_inds_sex))), 
+                                                 `Structural determinants:` = sort(struc_inds_sex))),
                                 multiple = FALSE)
 
 # Filters
-mhi_inequals <- selectInput("mhi_inequals", 
+mhi_inequals <- selectInput("mhi_inequals",
                                 label = "Select an indicator:",
                                 choices = c(list(`Mental health outcomes:` = sort(mhout_inds_simd),
                                                  `Individual determinants:` = sort(indiv_inds_simd),
                                                  `Community determinants:` = sort(comm_inds_simd),
-                                                 `Structural determinants:` = sort(struc_inds_simd))), 
+                                                 `Structural determinants:` = sort(struc_inds_simd))),
                                 multiple = FALSE)
 
 sex_inequals <- selectInput("sex_inequals",
@@ -218,7 +213,7 @@ sex_inequals <- selectInput("sex_inequals",
                            "Total (Males and Females)" = "Total", "Females" = "Female", "Males" = "Male"),
                          multiple = FALSE
                      )
-                         
+
                          
 # # cookie box to appear along the top of dashboard
 # cookie_box <-

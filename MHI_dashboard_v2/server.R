@@ -24,16 +24,16 @@ observe({
   cat(".")
 })
 
-#init reactive value storage
-rv = reactiveValues()
-
-#trigger event on tab selection change # from https://stackoverflow.com/questions/48584808/track-previous-tab-in-shiny-r
-observeEvent(input$intabset, {
-  #store old current tab as last tab reactive value
-  rv$last_tab = rv$current_tab
-  #store new current tab as cur tab reactive value
-  rv$current_tab = input$intabset
-})
+# #init reactive value storage
+# rv = reactiveValues()
+# 
+# #trigger event on tab selection change # from https://stackoverflow.com/questions/48584808/track-previous-tab-in-shiny-r
+# observeEvent(input$intabset, {
+#   #store old current tab as last tab reactive value
+#   rv$last_tab = rv$current_tab
+#   #store new current tab as cur tab reactive value
+#   rv$current_tab = input$intabset
+# })
 
 
 #session$onSessionEnded(stopApp)
@@ -44,13 +44,10 @@ observeEvent(input$intabset, {
 ###############################################.
 
 
-# # Sourcing server scripts -------------------------------------------
-# list.files("tabs_server", full.names = TRUE, recursive = TRUE) |>
-#   map(~ source(.))
-
+# Sourcing server scripts -------------------------------------------
 
 # Get functions
-# source(file.path("functions.R"), local = TRUE)$value
+source(file.path("functions.R"), local = TRUE)$value
 
 # Get content for individual pages
 

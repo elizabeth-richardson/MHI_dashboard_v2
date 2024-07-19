@@ -1,0 +1,328 @@
+---
+title: ""
+output: pdf_document
+geometry: margin=0.5cm
+params:
+  reactive_df: NA
+  chosen_sex: NA
+header-includes:
+- \usepackage[default]{sourcesanspro}
+- \usepackage[T1]{fontenc}
+- \usepackage{fancyhdr}
+- \usepackage{graphicx}
+- \usepackage{longtable}
+- \usepackage{tabu}
+- \usepackage{booktabs}
+- \usepackage{array}
+- \usepackage{multirow}
+- \usepackage{wrapfig}
+- \usepackage{float}
+- \usepackage{colortbl}
+- \usepackage{pdflscape}
+- \usepackage{threeparttable}
+- \usepackage{threeparttablex}
+- \usepackage[normalem]{ulem}
+- \usepackage{makecell}
+- \usepackage{xcolor}
+- \usepackage{hyperref}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+mainfont: SourceSansPro
+---
+
+```{r, include=FALSE}
+
+options(tinytex.verbose = TRUE)
+
+```
+
+```{r echo=FALSE, message= FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(kableExtra)
+library(tidyr)
+library(knitr)
+library(stringr)
+
+mydate <- Sys.Date()
+
+```
+
+
+
+\blandscape
+
+  \begin{minipage}{0.7\textwidth}
+    \raggedright
+    \textbf{\large{PHS Adult Mental Health Indicators}} \\
+    \large{National profile for Scotland}\\
+    Sex: `r params$chosen_sex` \\
+    Downloaded on: `r mydate` \\
+    From: Public Health Scotland's Adult Mental Health Indicators dashboard \\
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.3\textwidth}
+    \raggedleft
+    \includegraphics[width=100pt]{phs-logo-updated.png}
+  \end{minipage}
+  \bigskip
+  \begin{minipage}{0.95\textwidth}
+    \raggedright
+    \bigskip
+    \large{This national profile shows the latest available mental health indicator data for the population of Scotland, and compares the most and least deprived areas.} \par 
+    \bigskip
+    \large{Please see the dashboard for more detailed information, including data sources and data downloads.}  
+  \end{minipage}
+
+```{r setup, include=FALSE, dev="cairo_pdf"} 
+
+
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "")
+
+
+```
+
+
+```{r echo=FALSE, message= FALSE}
+
+
+# function to create sparkline for each indicator
+create_sparkline_nat <- function(data, col1, col2, maxval) {
+  plot <- ggplot(data, aes(x=1:length(trend), y=as.numeric(trend))) +
+    geom_line(linewidth=2, colour=col1) +
+    geom_area(fill=col2) +
+    theme_void() +
+    guides(fill = "none") +
+    scale_y_continuous(limits=c(0, maxval), expand = expansion(mult = c(0, 0.2))) +
+    theme(plot.margin = unit(c(0, 0, 0, 0), "cm"),
+          plot.background = element_rect(fill = "white", color = "white"),
+          panel.background = element_rect(fill = "white", color = "white"))
+  
+  return(plot)
+}
+
+plot_nodata <- function(height_plot = 20) {
+  df<-data.frame(x=1,y=1)
+  ggplot(df,aes(x,y)) +
+    geom_blank() +
+  #  annotate("text", x = 1, y = 1, size = 12, label = "No data") +
+    theme_void() 
+}
+
+```
+
+
+```{r echo=FALSE, message= FALSE}
+
+# temporary folder to save charts to
+graph_directory <- tempdir()
+
+
+```
+
+
+```{r echo=FALSE, message= FALSE}
+# # the data to plot
+df <- params$reactive_df %>%
+  select(domain, indname = ind_name, sdef = short_definition, yrange=year_range, 
+         value, mdvalue = most_depr_value, ldvalue = least_depr_value, maxval = max_val,
+         trend, leastdeptrend, mostdeptrend) %>%
+  mutate(value = str_replace_all(value, "%", "\\\\%"),
+         value = str_replace_all(value, "\n", ""),
+         mdvalue = str_replace_all(mdvalue, "%", "\\\\%"),
+         mdvalue = str_replace_all(mdvalue, "\n", ""),
+         ldvalue = str_replace_all(ldvalue, "%", "\\\\%"),
+         ldvalue = str_replace_all(ldvalue, "\n", ""))
+
+```
+
+
+```{r echo=FALSE, message= FALSE}
+# the data to be displayed in table
+table <- df %>%
+  mutate(indname = ifelse(indname=="Alcohol-related hospitalisation (mental and behavioural disorders)", "Alcohol-related hospitalisation*", indname)) %>%
+  mutate(domain = gsub(" ", "\n", domain)) %>%
+  mutate(domain = linebreak(domain)) %>%
+  mutate(yrange = gsub("to", "to\n", yrange)) %>%
+  mutate(yrange = linebreak(yrange, align = c("c"))) %>%
+  mutate(value = gsub("/100,000", "\n/100,000", value)) %>%
+  mutate(mdvalue = gsub("/100,000", "\n/100,000", mdvalue)) %>%
+  mutate(ldvalue = gsub("/100,000", "\n/100,000", ldvalue)) %>%
+  mutate(value = linebreak(value)) %>%
+  mutate(mdvalue = linebreak(mdvalue)) %>%
+  mutate(ldvalue = linebreak(ldvalue)) %>%
+ # mutate(ind = paste0(indname, "\n", sdef, " ", yrange, ".")) %>%
+ # mutate(ind = linebreak(ind, double_escape = TRUE)) %>% # "! Paragraph ended before \mcell@tabular was complete." / "! Missing } inserted."
+ # mutate(ind = paste0(
+ #   "\\textbf{",indname, "}\n", "\\textit{", sdef, " ", yrange, ".}")) %>%
+ # mutate(ind = linebreak(ind)) %>% # "! Paragraph ended before \mcell@tabular was complete." / "! Missing } inserted."
+  # mutate(indname2 = paste0(
+  #   "\\textbf{",indname, "}\n", "\\textit{", sdef, ".}")) %>%
+  # mutate(indname2 = paste0("\\makecell[c]{",
+  #                          indname, "\\\\", 
+  #                          sdef, " ", yrange, ".}")) %>%
+  # mutate(indname3 = paste0(indname, "\\\\", 
+  #                          sdef, " ", yrange, ".")) %>%
+  mutate(id = row_number(),
+         place2 = "A",
+         place3 = "B") %>% #placeholders, so there are enough cols
+  select(domain, indname, yrange, value, id, 
+         mdvalue, place2, 
+         ldvalue, place3)
+#table$ind <- linebreak(table$ind) 
+#\makecell[c]{a\\b\\c}
+# when table$ind not commented out: Warning: Error in <Anonymous>: arguments imply differing number of rows: 8, 2, 6; or (error not seen recently)
+# Paragraph ended before \mcell@tabular was complete. (ind and indname2 too)
+# when commented out: File ended while scanning use of \textit . (ind and indname2 too)
+
+```
+
+
+```{r echo=FALSE, message= FALSE}
+# define column headers for the pdf table
+colnames = c("Domain", 
+             "Indicator",
+             "Time period", 
+             "Latest value", "Time trend",
+             "Latest value", "Time trend",
+             "Latest value", "Time trend"
+            )
+
+```
+
+
+```{r echo=FALSE, message= FALSE}
+
+# get unique indicator list
+unique_indicators <- unique(df$indname)
+
+# Counter variable to keep track of which chart being generated
+counter <- 1
+
+# Iterate over each indicator and create/save a spineplot
+
+for (indname in unique_indicators) {
+
+  # Filter the data for the current indicator
+  indicator_data <- df %>% filter(indname == !!indname)
+
+  # create the plots
+  maxval <- as.numeric(indicator_data$maxval)
+
+  # All Scotland:
+  # Unnest the trend column for plotting
+  ind_df <- indicator_data %>%
+    select(trend) %>%
+    unnest(cols = c(trend))
+  # create the plot
+  if (length(ind_df$trend>0)) {
+  spark1 <- create_sparkline_nat(ind_df, col1 = "#0078D4", col2 = "#B3D7F2", maxval)
+  } else {
+  spark1 <- plot_nodata()
+  }
+  # create filename
+  filename1 <- sprintf("%s/scot_spark%s.png", graph_directory, counter)
+  # Save the plot as a PNG with the filename created
+  ggsave(filename1, plot = spark1, units="mm", width=15, height=5, dpi=300)
+
+  # Most deprived quintile:
+  # Unnest the trend column for plotting
+  ind_df <- indicator_data %>%
+    select(trend = mostdeptrend) %>%
+    unnest(cols = c(trend))
+  # create the plot
+  if (length(ind_df$trend>0)) {
+  spark2 <- create_sparkline_nat(ind_df, col1 = "#9B4393", col2 = "#E1C7DF",  maxval)
+  } else {
+  spark2 <- plot_nodata()
+  }
+  # create filename
+  filename2 <- sprintf("%s/md_spark%s.png", graph_directory, counter)
+  # Save the plot as a PNG with the filename created
+  ggsave(filename2, plot = spark2, units="mm", width=15, height=5, dpi=300)
+
+  # Least deprived quintile:
+  # Unnest the trend column for plotting
+  ind_df <- indicator_data %>%
+    select(trend = leastdeptrend) %>%
+    unnest(cols = c(trend))
+   # create the plot
+  if (length(ind_df$trend>0)) {
+  spark3 <- create_sparkline_nat(ind_df, col1 = "#83BB26", col2 = "#DAEBBE", maxval)
+  } else {
+  spark3 <- plot_nodata()
+  }
+  # create filename
+  filename3 <- sprintf("%s/ld_spark%s.png", graph_directory, counter)
+  # Save the plot as a PNG with the filename created
+  ggsave(filename3, plot = spark3, units="mm", width=15, height=5, dpi=300)
+
+  # increase counter variable
+  counter <- counter + 1
+}
+
+
+
+```
+
+
+
+```{r, echo= FALSE, message = FALSE}
+
+ # the final table to be displayed with charts embedded
+
+table %>%
+  group_by(domain) %>%
+  knitr::kable(
+    format = "latex", # must be in latex format for pdf download
+    booktabs = TRUE, # generic formatting
+    escape = FALSE, # ensures latex formatting on indicator column works (i.e.bold/italics,linebreaks)
+    longtable = TRUE, # ensures table goes across multiple pages when too long
+  #  align = c("l"), #left alignment within cells
+    col.names = colnames
+     ) %>% 
+  # format header
+  row_spec(0, background = "#032F4F", color = "white")  %>%
+  add_header_above(., c(" " = 3,
+                        "All Scotland" = 2,
+                        "20% most deprived datazones" = 2,
+                        "20% least deprived datazones" = 2),
+                   escape = TRUE,
+                   background = "#032F4F", color = "white") %>%
+ # collapse_rows(columns = 1, valign = "top") %>%
+  collapse_rows(columns = 1, valign = "top", row_group_label_position = "first", custom_latex_hline = 2:8, longtable_clean_cut = F) %>%
+  # set column widths
+  # column_spec(1, width = "8em") %>% # domain column
+  # column_spec(2, width = "20em") %>% # indicator column
+  # column_spec(3, width = "20em") %>% # value1
+  # column_spec(4, width = "6em") %>% # trend1
+  # column_spec(5, width = "3em") %>% # value2
+  #  column_spec(6, width = "20em") %>% # trend2
+  #  column_spec(7, width = "6em") %>% # value3
+  #  column_spec(8, width = "3em") %>% # trend3
+ # embed the chart images on each row of columns 5, 7 and 9
+   kableExtra::column_spec(5, width = "6em",
+                           image = sprintf("%s/scot_spark%s.png", graph_directory, table$id), color = "white") %>%
+   kableExtra::column_spec(7, width = "6em",
+                           image = sprintf("%s/md_spark%s.png", graph_directory, table$id), color = "white") %>%
+   kableExtra::column_spec(9, width = "6em",
+                           image = sprintf("%s/ld_spark%s.png", graph_directory, table$id), color = "white") %>%
+  # repeats column headings when table goes across multiple pages # all give ! Extra alignment tab has been changed to \cr.
+   kable_styling(latex_options = c("repeat_header")) %>%
+  # add footnote with link to profiles tool
+   footnote(general="\\\\url{https://scotland.shinyapps.io/phs-adult-mhi-dashboard/}",
+            general_title = "Source: ", footnote_as_chunk = T, escape=F) %>%
+   footnote(general="Alcohol-related hospitalisations due to mental and behavioural disorders only",
+            general_title = "*", footnote_as_chunk = T, escape=F)
+  # prevent domain from appearing on every row of column
+ # kableExtra::collapse_rows(columns = 1, valign = "top", row_group_label_position = "first", custom_latex_hline = 2:8, longtable_clean_cut = F) 
+# Warning: Error in [.data.frame: undefined columns selected
+
+
+
+```
+
+
+\elandscape

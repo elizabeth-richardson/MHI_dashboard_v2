@@ -30,12 +30,12 @@
 
    shinyjs::useShinyjs()
    
-   available_ci <- all_data %>%
+   available_ci3 <- all_data %>%
     subset(ind_name == input$mhi_inequals_sex & sex=="Female") %>%
     select(lower_ci)
 
   # Disabling and unchecking CI option if no CIs available
-  if (all(is.na(available_ci$lower_ci)) == TRUE) {
+  if (all(is.na(available_ci3$lower_ci)) == TRUE) {
     shinyjs::disable("ci_inequals_sex")
     checkboxInput(session, "ci_inequals_sex", value = FALSE)
   } else {
@@ -76,30 +76,6 @@ output$ui_area_types_sex <- renderUI({
     selected = "Scotland"
   )
 })
-
-# output$ui_spscales <- reactive({
-#   
-#   req(input$mhi_inequals_sex)
-#   
-#   shinyjs::useShinyjs()
-#   # list all the spatial scales available for the selected indicator, and supply these as choices to radio button group
-#   df <- all_data %>% subset(ind_name == input$mhi_inequals_sex & sex=="Female") %>% 
-#     group_by(spatial.scale) %>%
-#     summarise() %>%
-#     ungroup() %>%
-#     filter(!spatial.scale %in% c("SIMD", "SIMD deciles")) %>%
-#     mutate(spatial.scale = case_when(spatial.scale == "HB" ~ "Health Board",
-#                                      spatial.scale == "LA" ~ "Council Area",
-#                                      spatial.scale == "PD" ~ "Police Division",
-#                                      TRUE ~ spatial.scale)) %>%
-#     mutate(spatial.scale = factor(spatial.scale,
-#                                   levels = c("Scotland", "Health Board", "Council Area", "Police Division"
-#                                   ),
-#                                   labels = c("Scotland", "Health Board", "Council Area", "Police Division"
-#                                   ))) %>%
-#     arrange(spatial.scale)
-#   spscales <- as.vector(df$spatial.scale)
-#  })
 
 # Dynamic selection of the spatial unit, based on the selected indicator
 output$ui_inequals_sex_spunit <- renderUI({
@@ -173,12 +149,6 @@ sex_metadata <- reactive({
 
 output$title_sex <- renderUI({
   
-  # create dynamic text if no indicators available for selected profile
-  # and geography
-  shiny::validate(
-    need( nrow(inequals_sex_data()) > 0, "No data available for this indicator currently. Please select another.")
-  )
-  
   subtitle <- HTML(paste0("<b>Definition:</b> ", unique(sex_metadata()$short_definition)))
   
   source <- HTML(sex_metadata()$source_url)
@@ -190,7 +160,7 @@ output$title_sex <- renderUI({
                  tolower(unique(inequals_sex_data()$measure)), # units
                  inequals_sex_data()$value[inequals_sex_data()$year == max(inequals_sex_data()$year) & inequals_sex_data()$sex == "Female"], # female value
                  inequals_sex_data()$value[inequals_sex_data()$year == max(inequals_sex_data()$year) & inequals_sex_data()$sex == "Male"])) # male value
-  }
+  } else { "" }
     
 # display 4 x titles
 tagList(
@@ -237,7 +207,7 @@ output$metadata_sex <- renderUI({
   
     tagList(
       tags$h5(input$mhi_inequals_sex, class = "chart-header"), # selected indicator
-      tags$h6("Important information about the indicator data.")
+      tags$h6("Important information about the data for this indicator.")
     )
 })
 
@@ -355,9 +325,9 @@ output$sex_trend_plot <- renderPlot({
                          labels = new_year_labels_wrapped[seq(1, length(new_year_labels_wrapped), by = gap)]#,
                         # guide = "axis_minor"
                          ) +
-      theme(text = element_text(size=20, family="mono"),
-            axis.title.y = element_text(face = "bold", size = 18, angle = 0, vjust = 0.5),
-            axis.title.x = element_text(face = "bold", size = 18),
+      theme(text = element_text(size=18),
+            axis.title.y = element_text(size = 18, angle = 0, vjust = 0.5),
+            axis.title.x = element_text(size = 18),
             axis.text.x = element_text(size = 18, colour = 'black'),
             axis.text.y = element_text(size = 18, colour = 'black'),
             axis.ticks.x = element_line(),
@@ -402,7 +372,7 @@ output$sex_hover_info <- renderUI({ # code from https://gitlab.com/-/snippets/16
   
   req(inequals_sex_data())
   
-  hover <- input$plot_hover
+  hover <- input$plot_hover4
   point <- nearPoints(inequals_sex_data(), hover, threshold = 5, maxpoints = 1, addDist = TRUE) # threshold was 50
   if (nrow(point) == 0) return(NULL)
   
